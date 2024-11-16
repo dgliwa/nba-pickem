@@ -1,6 +1,20 @@
 # NBA games : data collection & model creation
+Fork from [nathanlauga/nba-games](https://github.com/Nathanlauga/nba-data-scrapping)
 
-**This project is currently on stand by.**
+## Getting Started
+Using [uv](https://docs.astral.sh/uv/) to manage dependencies.
+
+Download the kaggle dataset [here](https://www.kaggle.com/nathanlauga/nba-games) and put the CSVs in a `$PROJECT_ROOT/data` folder. (also ensure there's a `$PROJECT_ROOT/data/save/` directory). Then run:
+
+```
+uv sync
+./update_data.sh
+```
+
+This will kickoff a sync of all the latest games from the nba stats API.
+
+
+## Intro
 
 This repo is centered about NBA games. The main goal here is to create a model that will predict a winner for a NBA game.
 
@@ -10,8 +24,6 @@ There are differents steps for this project :
 3. Create model
 4. Automatize data collection
 5. Predict on next games (real)
-
-At this moment I'm at **[step 3]**.
 
 ## 1. Collect data
 
@@ -44,5 +56,3 @@ You can find the script that format data into `scripts` foled :
 ## 5. Predict on next games (real)
 
 
-Thanks for reading,
-*Nathan*
