@@ -16,8 +16,10 @@ NEWSPIDER_MODULE = "odds_collection.spiders"
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = "odds_collection (+http://www.yourdomain.com)"
 
+REFERER_ENABLED = False
+
 # Obey robots.txt rules
-ROBOTSTXT_OBEY = True
+ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
 #CONCURRENT_REQUESTS = 32
