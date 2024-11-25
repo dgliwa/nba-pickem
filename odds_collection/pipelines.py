@@ -8,9 +8,9 @@
 
 import pandas as pd
 
-from odds_collection.spiders.sports_book_moneyline import SportsBookMoneylineSpider
-from odds_collection.spiders.sports_book_over_under import SportsBookOverUnderSpider
-from odds_collection.spiders.sports_book_spread import SportsBookSpreadSpider
+from odds_collection.spiders import SportsBookMoneylineSpider
+from odds_collection.spiders import SportsBookOverUnderSpider
+from odds_collection.spiders import SportsBookSpreadSpider
 
 
 class OddsCollectionPipeline:
