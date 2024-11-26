@@ -5,9 +5,10 @@
 
 
 # useful for handling different item types with a single interface
-
+import os
 import pandas as pd
 
+from odds_collection.spiders import NbaGamesSpider
 from odds_collection.spiders import NbaSeasonMatchupsSpider
 from odds_collection.spiders import SportsBookMoneylineSpider
 from odds_collection.spiders import SportsBookOverUnderSpider
@@ -34,3 +35,8 @@ class OddsCollectionPipeline:
         elif isinstance(spider, NbaSeasonMatchupsSpider):
             df.drop_duplicates(inplace=True, subset=["GAME_ID"])
             df.to_csv("data/nba_season_matchups.csv", index=False)
+        elif isinstance(spider, NbaGamesSpider):
+            if not os.path.exists("data/nba_games.csv"):
+                df.to_csv("data/nba_games.csv", index=False)
+            else:
+                df.to_csv("data/nba_games.csv", index=False, mode="a", header=False)
