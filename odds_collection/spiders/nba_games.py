@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import datetime
 
 class NbaGamesSpider(scrapy.Spider):
-    download_delay = 0.25
+    download_delay = 1.0
     name = "nba_games"
     allowed_domains = ["stats.nba.com"]
     start_urls = ["https://stats.nba.com"]
@@ -24,43 +24,72 @@ class NbaGamesSpider(scrapy.Spider):
     STARTING_YEAR = 2017
 
     def start_requests(self):
-        matchups = pd.read_csv("data/nba_season_matchups.csv", dtype={"GAME_ID": str})
+        matchups = pd.read_csv("data/raw/nba_season_matchups.csv", dtype={"GAME_ID": str})
 
-        if os.path.exists("data/nba_games.csv"):
-            df = pd.read_csv("data/nba_games.csv", dtype={"GAME_ID": str})
-            games = matchups[~(matchups["GAME_ID"].isin(df["GAME_ID"].unique()))]["GAME_ID"].unique()
+        if os.path.exists("data/raw/nba_games.csv"):
+            df = pd.read_csv("data/raw/nba_games.csv", dtype={"GAME_ID": str})
+            game_dates = matchups[~(matchups["GAME_DATE_EST"].isin(df["GAME_DATE_EST"].unique()))]["GAME_DATE_EST"].unique()
         else:
-            games = matchups["GAME_ID"].unique()
+            game_dates = matchups["GAME_DATE_EST"].unique()
 
 
-        for game in games:
-            url = f"https://stats.nba.com/stats/boxscoresummaryv2?GameID={game}"
-            yield scrapy.Request(url=url, headers=self.HEADERS, callback=self.build_callback(game))
-
-    def build_callback(self, game):
-        return lambda r: self.parse(game, r)
+        for game_date in game_dates:
+            game_date_formatted = datetime.strptime(game_date, "%Y-%m-%d").strftime("%m/%d/%Y")
+            url = f"https://stats.nba.com/stats/scoreboardV2?DayOffset=0&LeagueID=00&gameDate={game_date_formatted}&seasonType=RegularSeason"
+            yield scrapy.Request(url=url, headers=self.HEADERS, callback=self.parse)
 
 
-    def parse(self, game, response):
+    def parse(self, response):
         jsonresponse = response.json()
         results = jsonresponse.get("resultSets")
-        summary = results[0]
-        game_date_est = summary.get("rowSet")[0][0]
-        home_team_id = summary.get("rowSet")[0][6]
-        away_team_id = summary.get("rowSet")[0][7]
-        season = summary.get("rowSet")[0][8]
-        line_score = results[5]
-        home_line = 0 if line_score.get("rowSet")[0][5] == home_team_id else 1
-        away_line = 1 if home_line == 0 else 0
-        home_team_points = line_score.get("rowSet")[home_line][22]
-        away_team_points = line_score.get("rowSet")[away_line][22]
-        return {
-            "GAME_DATE_EST": datetime.strptime(game_date_est, "%Y-%m-%dT%H:%M:%S").strftime("%Y-%m-%d"),
-            "GAME_ID": game,
-            "HOME_TEAM_ID": home_team_id,
-            "AWAY_TEAM_ID": away_team_id,
-            "SEASON": season,
-            "HOME_TEAM_POINTS": home_team_points,
-            "AWAY_TEAM_POINTS": away_team_points,
-            "HOME_TEAM_WINS": home_team_points > away_team_points,
-        }
+        game_headers = results[0]
+        game_scores = results[1]
+        eastern_standings = results[4]
+        western_standings = results[5]
+
+        games = []
+        for game in game_headers.get("rowSet"):
+            game_id = game[2]
+            home_team_id = game[6]
+            away_team_id = game[7]
+            season = game[8]
+            game_score_home = next((score for score in game_scores.get("rowSet") if score[2] == game_id and score[3] == home_team_id))
+            home_points = game_score_home[22]
+            game_score_away = next((score for score in game_scores.get("rowSet") if score[2] == game_id and score[3] == away_team_id))
+            away_points = game_score_away[22]
+            home_team_wins = home_points > away_points
+
+            if home_team_id in [r[0] for r in eastern_standings.get("rowSet")]:
+                home_team_rank = next((team for team in eastern_standings.get("rowSet") if team[0] == home_team_id))
+            else:
+                home_team_rank = next((team for team in western_standings.get("rowSet") if team[0] == home_team_id))
+
+            if away_team_id in [r[0] for r in eastern_standings.get("rowSet")]:
+                away_team_rank = next((team for team in eastern_standings.get("rowSet") if team[0] == away_team_id))
+            else:
+                away_team_rank = next((team for team in western_standings.get("rowSet") if team[0] == away_team_id))
+
+            home_win_pct = home_team_rank[9]
+            home_home_wins, home_home_losses = home_team_rank[10].split("-")
+            home_home_win_pct = int(home_home_wins) / (int(home_home_wins) + int(home_home_losses)) if int(home_home_wins) + int(home_home_losses) > 0 else 0
+
+            away_win_pct = away_team_rank[9]
+            away_away_wins, away_away_losses = away_team_rank[11].split("-")
+            away_away_win_pct = int(away_away_wins) / (int(away_away_wins) + int(away_away_losses)) if int(away_away_wins) + int(away_away_losses) > 0 else 0
+
+
+            games.append({
+                "GAME_DATE_EST": datetime.strptime(game[0], "%Y-%m-%dT%H:%M:%S").strftime("%Y-%m-%d"),
+                "GAME_ID": game_id,
+                "HOME_TEAM_ID": home_team_id,
+                "AWAY_TEAM_ID": away_team_id,
+                "SEASON": season,
+                "HOME_TEAM_POINTS": home_points,
+                "AWAY_TEAM_POINTS": away_points,
+                "HOME_WIN_PCT": home_win_pct,
+                "HOME_HOME_WIN_PCT": home_home_win_pct,
+                "AWAY_WIN_PCT": away_win_pct,
+                "AWAY_AWAY_WIN_PCT": away_away_win_pct,
+                "HOME_TEAM_WINS": home_team_wins,
+            })
+        return games

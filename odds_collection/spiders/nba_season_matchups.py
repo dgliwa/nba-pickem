@@ -44,7 +44,9 @@ class NbaSeasonMatchupsSpider(scrapy.Spider):
 
         games = []
         for row in jsonresponse.get("resultSets")[0].get("rowSet"):
-            games.append({ "SEASON": year, "GAME_ID": row[1], "TEAM_ID": team_id })
+            date = row[0].split()[0]
+            game_date = datetime.strptime(date, "%m/%d/%Y").strftime("%Y-%m-%d")
+            games.append({ "SEASON": year, "GAME_ID": row[1], "TEAM_ID": team_id, "GAME_DATE_EST": game_date })
         return games
 
     def convert_to_season_format(self, season):
