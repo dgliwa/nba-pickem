@@ -30,14 +30,26 @@ class OddsCollectionPipeline:
             return
         df = pd.DataFrame(self.games)
         if isinstance(spider, SportsBookMoneylineSpider):
-            df.to_csv("data/raw/odds/moneyline.csv", index=False)
+            if not os.path.exists("data/raw/odds/moneyline.csv"):
+                df.to_csv("data/raw/odds/moneyline.csv", index=False)
+            else:
+                df.to_csv("data/raw/odds/moneyline.csv", index=False, mode="a", header=False)
         elif isinstance(spider, SportsBookSpreadSpider):
-            df.to_csv("data/raw/odds/spreads.csv", index=False)
+            if not os.path.exists("data/raw/odds/spreads.csv"):
+                df.to_csv("data/raw/odds/spread.csv", index=False)
+            else:
+                df.to_csv("data/raw/odds/spread.csv", index=False, mode="a", header=False)
         elif isinstance(spider, SportsBookOverUnderSpider):
-            df.to_csv("data/raw/odds/over_under.csv", index=False)
+            if not os.path.exists("data/raw/odds/over_under.csv"):
+                df.to_csv("data/raw/odds/over_under.csv", index=False)
+            else:
+                df.to_csv("data/raw/odds/over_under.csv", index=False, mode="a", header=False)
         elif isinstance(spider, NbaSeasonMatchupsSpider):
             df.drop_duplicates(inplace=True, subset=["GAME_ID"])
-            df.to_csv("data/raw/nba_season_matchups.csv", index=False)
+            if not os.path.exists("data/raw/nba_season_matchups.csv"):
+                df.to_csv("data/raw/nba_season_matchups.csv", index=False)
+            else:
+                df.to_csv("data/raw/nba_season_matchups.csv", index=False, mode="a", header=False)
         elif isinstance(spider, NbaGamesSpider):
             if not os.path.exists("data/raw/nba_games.csv"):
                 df.to_csv("data/raw/nba_games.csv", index=False)

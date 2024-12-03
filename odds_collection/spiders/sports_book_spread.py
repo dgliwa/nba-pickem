@@ -1,5 +1,5 @@
 import scrapy
-
+import os
 import pandas as pd
 
 SPORTSBOOKS = [
@@ -16,11 +16,20 @@ class SportsBookSpreadSpider(scrapy.Spider):
     allowed_domains = ["sportsbookreview.com"]
     start_urls = ["https://sportsbookreview.com"]
 
+    def __init__(self):
+        if os.path.exists("data/raw/nba_games.csv"):
+            self.nba_games = pd.read_csv("data/raw/nba_games.csv", dtype={"GAME_ID": str}).sort_values("GAME_DATE_EST")
+
+        if os.path.exists("data/raw/odds/spread.csv"):
+            self.spread = pd.read_csv("data/raw/odds/spread.csv", dtype={"GAME_ID": str}).sort_values("date")
+        else:
+            self.spread = pd.DataFrame()
+
     def start_requests(self):
-        df = pd.read_csv("data/games.csv")
-        df = df.sort_values(by="GAME_DATE_EST", ascending=False)
-        df = df[df["SEASON"] >= 2019]
-        game_dates = df["GAME_DATE_EST"].unique()
+        self.nba_games = self.nba_games[self.nba_games["SEASON"] >= 2019]
+        if len(self.spread) > 0:
+            self.nba_games = self.nba_games[~self.nba_games["GAME_DATE_EST"].isin(self.spread["date"].unique())]
+        game_dates = self.nba_games["GAME_DATE_EST"].unique()
         for game_date in game_dates:
             url = f"https://www.sportsbookreview.com/betting-odds/nba-basketball/?date={game_date}"
             yield scrapy.Request(url=url, callback=self.parse)
