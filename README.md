@@ -1,5 +1,5 @@
 # NBA games : data collection & model creation
-Initially inspired by this [kaggle project]ttps://www.kaggle.com/datasets/nathanlauga/nba-games). This repo hosts a few things:
+Initially inspired by this [kaggle project](https://www.kaggle.com/datasets/nathanlauga/nba-games). This repo hosts a few things:
 
 * Collection of NBA game data
 * Exploration of said nba game data
@@ -9,8 +9,6 @@ Initially inspired by this [kaggle project]ttps://www.kaggle.com/datasets/nathan
 
 ## Getting Started
 Using [uv](https://docs.astral.sh/uv/) to manage dependencies.
-
-Download the kaggle dataset [here](https://www.kaggle.com/nathanlauga/nba-games) and put the CSVs in a `$PROJECT_ROOT/data` folder. (also ensure there's a `$PROJECT_ROOT/data/save/` directory). Then run:
 
 ```
 uv sync
