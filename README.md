@@ -1,5 +1,11 @@
 # NBA games : data collection & model creation
-Fork from [nathanlauga/nba-games](https://github.com/Nathanlauga/nba-data-scrapping)
+Initially inspired by this [kaggle project]ttps://www.kaggle.com/datasets/nathanlauga/nba-games). This repo hosts a few things:
+
+* Collection of NBA game data
+* Exploration of said nba game data
+* Model generation to predict winners of nba games
+  * Analysis of model performance with betting odds data to predict performance
+* A web application that displays game winners for the current day (COMING SOON)
 
 ## Getting Started
 Using [uv](https://docs.astral.sh/uv/) to manage dependencies.
@@ -8,51 +14,35 @@ Download the kaggle dataset [here](https://www.kaggle.com/nathanlauga/nba-games)
 
 ```
 uv sync
-./update_data.sh
+uv run jupyter server
 ```
 
-This will kickoff a sync of all the latest games from the nba stats API.
+This will kick off the jupyter notebook server to run and explore the data notebooks used to generate nba game winner predictions.
 
+Advised that you start in `notebooks/00_init.ipynb`
 
-## Intro
+## Data Collection
 
-This repo is centered about NBA games. The main goal here is to create a model that will predict a winner for a NBA game.
+[scrapy](https://docs.scrapy.org/en/latest/index.html) is used to retrieve the team, game, and betting odds data.
 
-There are differents steps for this project :
-1. Collect data
-2. Format data
-3. Create model
-4. Automatize data collection
-5. Predict on next games (real)
+Game data is collected from the [nba stats website](https://stats.nba.com/).
+Odds data is collected from [sportsbookreview](https://www.sportsbookreview.com)
 
-## 1. Collect data
+To collect the data you can run the `00_init.ipynb` notebook, or run scrapy commands for the various scrapers
 
-You can find how I collect the data on the `scripts/` folder. 
+ex: `uv run scrapy crawl nba_teams`
 
-I would like to thanks [nba stats website](https://stats.nba.com/) which allows all NBA data freely open to everyone and with a great api endpoint.
+## Analysis
 
-- `get_games.py` : collect all games from yesterday to 2003
-- `get_teams.py` : collect all teams from NBA
-- `get_players.py` : collect all players from NBA based on games dataset **[WORK IN PROGRESS]**
-- `get_game_stats.py` : collect games details based on games dataset
+Model exploration happens in the `notebook` dir. Things like feature analysis, generation, model creation, profit calculation, etc is in these notebooks.
 
-Also this is the script that will get all new games (but you need old datasets available on Kaggle here : [dataset link](https://www.kaggle.com/nathanlauga/nba-games)) and don't forget to put it in data folder and to indicate it into the script :
-- `get_new_games.py`
+## Webapp Predictions
 
-## 2. Format data
+TODO
 
-You can find the script that format data into `scripts` foled : 
+# Contributing
 
-- `format_games_for_model.py` : format dataset for the model
+Check out the issues and milestones
 
-
-## 3. Create model
-
-**[WORK IN PROGRESS]**
-
-## 4. Automatize data collection
-
-
-## 5. Predict on next games (real)
 
 
