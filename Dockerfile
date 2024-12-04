@@ -1,6 +1,9 @@
 FROM python:3.11-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
+ARG PORT
+ENV PORT=${PORT:-8000}
+
 # Change the working directory to the `app` directory
 WORKDIR /app
 
