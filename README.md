@@ -37,7 +37,7 @@ Model exploration happens in the `notebook` dir. Things like feature analysis, g
 
 ## Webapp Predictions
 
-TODO
+To run the webapp locally, run `uv run uvicorn --reload web.app:main`. It will be available at localhost:8000
 
 # Contributing
 

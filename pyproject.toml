@@ -3,5 +3,5 @@ name = "nba-data-scrapping"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.9"
-dependencies = ["pandas", "joblib", "requests", "jupyter", "matplotlib", "numpy", "seaborn", "scikit-learn", "scrapy"]
+requires-python = ">=3.10"
+dependencies = ["pandas", "joblib", "requests", "jupyter", "matplotlib", "numpy", "seaborn", "scikit-learn", "scrapy", "python-fasthtml"]
