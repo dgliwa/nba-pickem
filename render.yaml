@@ -8,7 +8,7 @@ services:
   region: virginia
   dockerContext: .
   dockerfilePath: ./Dockerfile
-  dockerCommand: ["uv", "run", "uvicorn", "web.main:app", "--host", "0.0.0.0"]
+  dockerCommand: "uv run uvicorn web.main:app --host 0.0.0.0"
   envVars:
       - key: CELERY_BROKER_URL
         fromService:
@@ -23,7 +23,7 @@ services:
   region: virginia
   dockerContext: .
   dockerfilePath: ./Dockerfile
-  dockerCommand: ["uv", "run", "celery", "worker", "-A", "worker.main", "--loglevel=info"]
+  dockerCommand: "uv run celery worker -A worker.main --loglevel=info"
   envVars:
       - key: CELERY_BROKER_URL
         fromService:
@@ -38,7 +38,7 @@ services:
   region: virginia
   dockerContext: .
   dockerfilePath: ./Dockerfile
-  dockerCommand: ["uv", "run", "celery", "flower", "-A", "worker.main", "--loglevel=info"]
+  dockerCommand: "uv run celery flower -A worker.main --loglevel=info"
   envVars:
       - key: CELERY_BROKER_URL
         fromService:
