@@ -10,10 +10,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project
 
 ADD ./web /app/web
+ADD ./worker /app/worker
 ADD ./pyproject.toml /app
 ADD ./uv.lock /app
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen
-
-CMD ["uv", "run", "uvicorn", "web.main:app", "--host", "0.0.0.0"]

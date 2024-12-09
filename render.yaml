@@ -8,8 +8,45 @@ services:
   region: virginia
   dockerContext: .
   dockerfilePath: ./Dockerfile
+  dockerCommand: ["uv", "run", "uvicorn", "web.main:app", "--host", "0.0.0.0"]
+  envVars:
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: pickem-redis
+          type: redis
+          property: connectionString
+- type: worker
+  name: nba-pickem-worker
+  runtime: docker
+  repo: https://github.com/dgliwa/nba-pickem
+  plan: free
+  region: virginia
+  dockerContext: .
+  dockerfilePath: ./Dockerfile
+  dockerCommand: ["uv", "run", "celery", "worker", "-A", "worker.main", "--loglevel=info"]
+  envVars:
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: pickem-redis
+          type: redis
+          property: connectionString
+- type: web
+  name: celery-admin-ui
+  runtime: docker
+  repo: https://github.com/dgliwa/nba-pickem
+  plan: free
+  region: virginia
+  dockerContext: .
+  dockerfilePath: ./Dockerfile
+  dockerCommand: ["uv", "run", "celery", "flower", "-A", "worker.main", "--loglevel=info"]
+  envVars:
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: pickem-redis
+          type: redis
+          property: connectionString
 - type: redis
-  name: celery-redis
+  name: pickem-redis
   region: virginia
   plan: free # we choose a plan with persistence to ensure tasks are not lost upon restart
   maxmemoryPolicy: noeviction # recommended policy for queues
