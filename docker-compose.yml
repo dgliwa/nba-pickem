@@ -20,6 +20,14 @@ services:
     environment:
       - CELERY_BROKER_URL=redis://redis:6379
 
+  celery-beat:
+    build: .
+    command: uv run celery -A worker.main beat --loglevel=info
+    depends_on:
+      - redis
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379
+
   flower:
     build: .
     command: uv run celery -A worker.main flower --loglevel=info
