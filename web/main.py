@@ -1,5 +1,6 @@
 from fasthtml import FastHTML
 from fasthtml.common import *
+from worker import main
 
 app = FastHTML(hdrs=picolink)
 
@@ -19,6 +20,7 @@ GAMES = [
 
 @app.get("/")
 def index():
+  main.add.delay(5, 5)
   return Titled(
     "NBA Pick'em",
     Div(
