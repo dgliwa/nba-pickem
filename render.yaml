@@ -19,7 +19,7 @@ services:
   name: nba-pickem-worker
   runtime: docker
   repo: https://github.com/dgliwa/nba-pickem
-  # plan: starter
+  plan: standard
   region: virginia
   dockerContext: .
   dockerfilePath: ./Dockerfile
