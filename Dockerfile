@@ -12,10 +12,19 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --frozen --no-install-project
 
+ADD ./scrapy.cfg /app/scrapy.cfg
 ADD ./web /app/web
 ADD ./worker /app/worker
+ADD ./services /app/services
+ADD ./odds_collection /app/odds_collection
 ADD ./pyproject.toml /app
 ADD ./uv.lock /app
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen
+
+# TODO: Eventually replace this with a process to seed a db
+ADD ./data/raw /app/data/raw
+RUN test -f /app/data/raw/nba_teams.csv \
+    && test -f /app/data/raw/nba_season_matchups.csv \
+    && test -f /app/data/raw/nba_games.csv

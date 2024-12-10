@@ -25,6 +25,7 @@ class NbaSeasonMatchupsSpider(scrapy.Spider):
     STARTING_YEAR = 2017
 
     def __init__(self):
+        self.log("initializing nba season matchups spider", level=logging.INFO)
         if os.path.exists("data/raw/nba_season_matchups.csv"):
             self.matchups = pd.read_csv("data/raw/nba_season_matchups.csv", dtype={"GAME_ID": str})
         else:

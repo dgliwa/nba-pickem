@@ -1,3 +1,4 @@
+import logging
 import scrapy
 
 import os
@@ -24,6 +25,7 @@ class NbaGamesSpider(scrapy.Spider):
     STARTING_YEAR = 2017
 
     def start_requests(self):
+        self.log("initializing nba season games spider", level=logging.INFO)
         matchups = pd.read_csv("data/raw/nba_season_matchups.csv", dtype={"GAME_ID": str})
 
         if os.path.exists("data/raw/nba_games.csv"):
