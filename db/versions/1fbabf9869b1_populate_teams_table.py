@@ -21,7 +21,7 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 teams = table('teams',
-    column('id', sa.String),
+    column('team_id', sa.String),
     column('league_id', sa.String(2)),
     column('abbreviation', sa.String(3)),
     column('city', sa.String(120)),
@@ -35,7 +35,7 @@ def upgrade() -> None:
     for _, team in teams_pd.iterrows():
         connection.execute(
             teams.insert().values(
-                id= team["TEAM_ID"],
+                team_id= team["TEAM_ID"],
                 league_id=team["LEAGUE_ID"],
                 abbreviation=team["ABBREVIATION"],
                 city=team["CITY"],
