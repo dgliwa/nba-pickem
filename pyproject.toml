@@ -19,4 +19,6 @@ dependencies = [
   "flower",
   "redis",
   "crochet",
+  "alembic",
+  "psycopg2-binary"
 ]
