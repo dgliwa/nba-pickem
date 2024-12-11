@@ -1,4 +1,4 @@
-# Scrapy settings for odds_collection project
+# Scrapy settings for scraping project
 #
 # For simplicity, this file contains only settings considered important or
 # commonly used. You can find more settings consulting the documentation:
@@ -7,14 +7,14 @@
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
-BOT_NAME = "odds_collection"
+BOT_NAME = "scraping"
 
-SPIDER_MODULES = ["odds_collection.spiders"]
-NEWSPIDER_MODULE = "odds_collection.spiders"
+SPIDER_MODULES = ["scraping.spiders"]
+NEWSPIDER_MODULE = "scraping.spiders"
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
-#USER_AGENT = "odds_collection (+http://www.yourdomain.com)"
+#USER_AGENT = "scraping (+http://www.yourdomain.com)"
 
 REFERER_ENABLED = False
 
@@ -47,13 +47,13 @@ TELNETCONSOLE_ENABLED = False
 # Enable or disable spider middlewares
 # See https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 #SPIDER_MIDDLEWARES = {
-#    "odds_collection.middlewares.OddsCollectionSpiderMiddleware": 543,
+#    "scraping.middlewares.OddsCollectionSpiderMiddleware": 543,
 #}
 
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #DOWNLOADER_MIDDLEWARES = {
-#    "odds_collection.middlewares.OddsCollectionDownloaderMiddleware": 543,
+#    "scraping.middlewares.OddsCollectionDownloaderMiddleware": 543,
 #}
 
 # Enable or disable extensions
@@ -65,7 +65,7 @@ TELNETCONSOLE_ENABLED = False
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-  "odds_collection.pipelines.OddsCollectionPipeline": 300,
+  "scraping.pipelines.OddsCollectionPipeline": 300,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)

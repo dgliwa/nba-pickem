@@ -8,12 +8,12 @@
 import os
 import pandas as pd
 
-from odds_collection.spiders import NbaGamesSpider
-from odds_collection.spiders import NbaSeasonMatchupsSpider
-from odds_collection.spiders import NbaTeamsSpider
-from odds_collection.spiders import SportsBookMoneylineSpider
-from odds_collection.spiders import SportsBookOverUnderSpider
-from odds_collection.spiders import SportsBookSpreadSpider
+from scraping.spiders import NbaGamesSpider
+from scraping.spiders import NbaSeasonMatchupsSpider
+from scraping.spiders import NbaTeamsSpider
+from scraping.spiders import SportsBookMoneylineSpider
+from scraping.spiders import SportsBookOverUnderSpider
+from scraping.spiders import SportsBookSpreadSpider
 
 
 class OddsCollectionPipeline:

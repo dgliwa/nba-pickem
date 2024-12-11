@@ -18,7 +18,7 @@ ADD ./scrapy.cfg /app/scrapy.cfg
 ADD ./web /app/web
 ADD ./worker /app/worker
 ADD ./services /app/services
-ADD ./odds_collection /app/odds_collection
+ADD ./scraping /app/scraping
 ADD ./pyproject.toml /app
 ADD ./uv.lock /app
 
