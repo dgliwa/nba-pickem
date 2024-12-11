@@ -9,24 +9,27 @@ services:
     depends_on:
       - redis
       - celery
-    env_file:
-      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - CELERY_BROKER_URL=redis://redis:6379
 
   celery:
     build: .
     command: uv run celery -A worker.main worker --loglevel=info
     depends_on:
       - redis
-    env_file:
-      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - CELERY_BROKER_URL=redis://redis:6379
 
   celery-beat:
     build: .
     command: uv run celery -A worker.main beat --loglevel=info
     depends_on:
       - redis
-    env_file:
-      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - CELERY_BROKER_URL=redis://redis:6379
 
   flower:
     build: .
@@ -36,8 +39,9 @@ services:
     depends_on:
       - redis
       - celery
-    env_file:
-      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - CELERY_BROKER_URL=redis://redis:6379
 
   redis:
     image: redis:latest
