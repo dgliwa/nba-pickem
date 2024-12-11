@@ -30,5 +30,4 @@ def upgrade() -> None:
 
 def downgrade():
     op.drop_table('teams')
-    pass
 
