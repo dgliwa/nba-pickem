@@ -27,6 +27,7 @@ class NbaGamesSpider(scrapy.Spider):
         self.log("initializing nba season games spider", level=logging.INFO)
         matchups = retrieve_matchups_df()
         games = retrieve_games_df()
+        # breakpoint()
 
         if len(games):
             game_dates = matchups[~(matchups["GAME_DATE_EST"].isin(games["GAME_DATE_EST"].unique()))]["GAME_DATE_EST"].unique()
@@ -35,7 +36,7 @@ class NbaGamesSpider(scrapy.Spider):
 
 
         for game_date in game_dates:
-            game_date_formatted = datetime.strptime(game_date, "%Y-%m-%d").strftime("%m/%d/%Y")
+            game_date_formatted = game_date.strftime("%m/%d/%Y")
             url = f"https://stats.nba.com/stats/scoreboardV2?DayOffset=0&LeagueID=00&gameDate={game_date_formatted}&seasonType=RegularSeason"
             yield scrapy.Request(url=url, headers=self.HEADERS, callback=self.parse)
 
