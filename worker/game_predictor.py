@@ -19,7 +19,6 @@ def predict_todays_games():
   save_predictions(todays_games)
 
 
-
 def load_model():
   return pickle.load(open('worker/nba_model.pkl', 'rb'))
 
@@ -138,4 +137,4 @@ def prettify_winner(row):
 
 def save_predictions(todays_games):
   todays_games_json = todays_games.to_json(orient='records')
-  redis_client.setex('todays_games', 86400, todays_games_json)
+  redis_client.setex('todays_games', 3600, todays_games_json)
