@@ -1,7 +1,6 @@
 import scrapy
 
 import logging
-import os
 import pandas as pd
 from datetime import datetime
 
@@ -28,11 +27,6 @@ class NbaSeasonMatchupsSpider(scrapy.Spider):
         teams = pd.read_csv("data/teams.csv")
 
         most_recent_season = self.STARTING_YEAR
-        if os.path.exists("data/matchups.csv"):
-            df = pd.read_csv("data/matchups.csv")
-            df = df.sort_values(by="SEASON", ascending=False)
-            most_recent_season = df["SEASON"].iloc[0]
-
         for season in range(most_recent_season, datetime.now().year):
             for team_id in teams["TEAM_ID"]:
                 formatted_season = self.convert_to_season_format(season)
