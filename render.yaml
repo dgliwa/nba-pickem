@@ -23,7 +23,7 @@ services:
   region: virginia
   dockerContext: .
   dockerfilePath: ./Dockerfile
-  dockerCommand: "uv run celery worker -A worker.main --loglevel=info"
+  dockerCommand: "uv run celery -A worker worker.main --loglevel=info"
   envVars:
       - key: CELERY_BROKER_URL
         fromService:
@@ -38,7 +38,7 @@ services:
   region: virginia
   dockerContext: .
   dockerfilePath: ./Dockerfile
-  dockerCommand: "uv run celery flower -A worker.main --loglevel=info"
+  dockerCommand: "uv run celery -A flower worker.main --loglevel=info"
   envVars:
       - key: CELERY_BROKER_URL
         fromService:
