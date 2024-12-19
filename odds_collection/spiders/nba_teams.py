@@ -22,7 +22,7 @@ class NbaTeamsSpider(scrapy.Spider):
     STARTING_YEAR = 2017
 
     def start_requests(self):
-        if os.path.exists("data/nba_teams.csv"):
+        if os.path.exists("data/raw/nba_teams.csv"):
             return
 
         url = "https://stats.nba.com/stats/commonteamyears?LeagueID=00"
