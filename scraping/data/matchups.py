@@ -5,7 +5,7 @@ from services import db_engine
 def retrieve_matchups_df() -> pd.DataFrame:
   if db_engine:
     with db_engine.connect() as con:
-      df = pd.read_sql('SELECT GAME_ID, SEASON, GAME_DATE_EST, TEAM_ID FROM RAW_MATCHUPS', con)
+      df = pd.read_sql('SELECT GAME_ID, SEASON, GAME_DATE_EST FROM RAW_MATCHUPS', con)
       df.columns = [c.upper() for c in df.columns]
 
       return df
@@ -15,7 +15,7 @@ def retrieve_matchups_df() -> pd.DataFrame:
     return pd.DataFrame()
 
 def save_matchups_df(matchups_df):
-  matchups_df.drop_duplicates(inplace=True, subset=["GAME_ID"]) # should we store both sides here?, "TEAM_ID"])
+  matchups_df.drop_duplicates(inplace=True, subset=["GAME_ID"]) 
   if db_engine:
     with db_engine.connect() as con:
       matchups_df.columns = [c.lower() for c in matchups_df.columns]

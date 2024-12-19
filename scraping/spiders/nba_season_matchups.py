@@ -45,20 +45,20 @@ class NbaSeasonMatchupsSpider(scrapy.Spider):
     def build_callback(self, team_id, season):
         return lambda r: self.parse(team_id, season, r)
 
-
     def parse(self, team_id, year, response):
         jsonresponse = response.json()
         if len(jsonresponse.get("resultSets")[0].get("rowSet")) != 82:
             self.log(f"Team {team_id} did not play 82 games in {year}", level=logging.INFO)
 
-        games = []
+        matchups = []
         for row in jsonresponse.get("resultSets")[0].get("rowSet"):
             date = row[0].split()[0]
-            game_date = datetime.strptime(date, "%m/%d/%Y").strftime("%Y-%m-%d")
-            if len(self.matchups) > 0 and row[1] in self.matchups["GAME_ID"].values:
+            game_date = datetime.strptime(date, "%m/%d/%Y")
+            if game_date.date() == datetime.today().date() or (len(self.matchups) > 0 and row[1] in self.matchups["GAME_ID"].values):
                 continue
-            games.append({ "SEASON": year, "GAME_ID": row[1], "TEAM_ID": team_id, "GAME_DATE_EST": game_date })
-        return games
+            game_date_str = game_date.strftime("%Y-%m-%d")
+            matchups.append({ "SEASON": year, "GAME_ID": row[1], "GAME_DATE_EST": game_date_str })
+        return matchups
 
     def convert_to_season_format(self, season):
         return f"{season}-{(season % 2000) + 1}"

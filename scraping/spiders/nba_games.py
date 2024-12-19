@@ -23,16 +23,19 @@ class NbaGamesSpider(scrapy.Spider):
 
     STARTING_YEAR = 2017
 
-    def start_requests(self):
+    def __init__(self):
         self.log("initializing nba season games spider", level=logging.INFO)
-        matchups = retrieve_matchups_df()
-        games = retrieve_games_df()
+        self.matchups = retrieve_matchups_df()
+        self.games = retrieve_games_df()
+        super().__init__()
+
+    def start_requests(self):
         # breakpoint()
 
-        if len(games):
-            game_dates = matchups[~(matchups["GAME_DATE_EST"].isin(games["GAME_DATE_EST"].unique()))]["GAME_DATE_EST"].unique()
+        if len(self.games):
+            game_dates = self.matchups[~(self.matchups["GAME_DATE_EST"].isin(self.games["GAME_DATE_EST"].unique()))]["GAME_DATE_EST"].unique()
         else:
-            game_dates = matchups["GAME_DATE_EST"].unique()
+            game_dates = self.matchups["GAME_DATE_EST"].unique()
 
 
         for game_date in game_dates:
@@ -49,7 +52,7 @@ class NbaGamesSpider(scrapy.Spider):
         eastern_standings = results[4]
         western_standings = results[5]
 
-        games = []
+        nba_games = []
         for game in game_headers.get("rowSet"):
             game_id = game[2]
             home_team_id = game[6]
@@ -80,7 +83,7 @@ class NbaGamesSpider(scrapy.Spider):
             away_away_win_pct = int(away_away_wins) / (int(away_away_wins) + int(away_away_losses)) if int(away_away_wins) + int(away_away_losses) > 0 else 0
 
 
-            games.append({
+            nba_games.append({
                 "GAME_DATE_EST": datetime.strptime(game[0], "%Y-%m-%dT%H:%M:%S").strftime("%Y-%m-%d"),
                 "GAME_ID": game_id,
                 "HOME_TEAM_ID": home_team_id,
@@ -94,4 +97,4 @@ class NbaGamesSpider(scrapy.Spider):
                 "AWAY_AWAY_WIN_PCT": away_away_win_pct,
                 "HOME_TEAM_WINS": home_team_wins,
             })
-        return games
+        return nba_games
