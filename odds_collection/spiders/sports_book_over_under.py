@@ -17,7 +17,7 @@ class SportsBookOverUnderSpider(scrapy.Spider):
     start_urls = ["https://sportsbookreview.com"]
 
     def start_requests(self):
-        df = pd.read_csv("../data/games.csv")
+        df = pd.read_csv("data/games.csv")
         df = df.sort_values(by="GAME_DATE_EST", ascending=False)
         df = df[df["SEASON"] >= 2019]
         game_dates = df["GAME_DATE_EST"].unique()
