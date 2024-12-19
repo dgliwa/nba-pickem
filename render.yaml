@@ -1,0 +1,11 @@
+# Exported from Render on 2024-12-04T14:30:06Z
+services:
+- type: web
+  name: nba-pickem
+  runtime: docker
+  repo: https://github.com/dgliwa/nba-pickem
+  plan: free
+  region: virginia
+  dockerContext: .
+  dockerfilePath: ./Dockerfile
+version: "1"
