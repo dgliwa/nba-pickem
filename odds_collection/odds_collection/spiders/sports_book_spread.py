@@ -22,7 +22,7 @@ class SportsBookSpreadSpider(scrapy.Spider):
         df = df[df["SEASON"] >= 2019]
         game_dates = df["GAME_DATE_EST"].unique()
         for game_date in game_dates:
-            url = f"https://www.sportsbookreview.com/betting-odds/nba-basketball/totals/full-game/?date={game_date}"
+            url = f"https://www.sportsbookreview.com/betting-odds/nba-basketball/?date={game_date}"
             yield scrapy.Request(url=url, callback=self.parse)
 
     def parse(self, response):
@@ -49,4 +49,6 @@ class SportsBookSpreadSpider(scrapy.Spider):
         self.log(f"Odds: {odds}")
         if not odds:
             return (pd.NA, pd.NA, pd.NA, pd.NA)
-        return (float(odds[0].get()), int(odds[1].get()), float(odds[2].get()), int(odds[3].get()))
+        away_spread = float(odds[0].get()) if odds[0].get() != "PK" else 0.0
+        home_spread = float(odds[2].get()) if odds[2].get() != "PK" else 0.0
+        return (away_spread, int(odds[1].get()), home_spread, int(odds[3].get()))
