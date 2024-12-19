@@ -27,7 +27,5 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen
 
 # TODO: Eventually replace this with a process to seed a db
-ADD ./data/raw /app/data/raw
-RUN test -f /app/data/raw/nba_teams.csv \
-    && test -f /app/data/raw/nba_season_matchups.csv \
-    && test -f /app/data/raw/nba_games.csv
+ADD ./data/raw/nba_teams.csv /app/data/raw/nba_teams.csv
+RUN test -f /app/data/raw/nba_teams.csv 
