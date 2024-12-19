@@ -27,6 +27,8 @@ def retrieve_games_df() -> pd.DataFrame:
       """
       df = pd.read_sql(query, con)
       df.columns = [c.upper() for c in df.columns]
+      df["HOME_TEAM_ID"] = df["HOME_TEAM_ID"].astype(int)
+      df["AWAY_TEAM_ID"] = df["AWAY_TEAM_ID"].astype(int)
       return df
   elif os.path.exists("data/raw/nba_games.csv"):
     return pd.read_csv("data/raw/nba_games.csv", dtype={"GAME_ID": str}, parse_dates=["GAME_DATE_EST"])
