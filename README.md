@@ -24,6 +24,7 @@ Advised that you start in `notebooks/00_init.ipynb`
 [scrapy](https://docs.scrapy.org/en/latest/index.html) is used to retrieve the team, game, and betting odds data.
 
 Game data is collected from the [nba stats website](https://stats.nba.com/).
+
 Odds data is collected from [sportsbookreview](https://www.sportsbookreview.com)
 
 To collect the data you can run the `00_init.ipynb` notebook, or run scrapy commands for the various scrapers (NOTE: These can take a long time!)
