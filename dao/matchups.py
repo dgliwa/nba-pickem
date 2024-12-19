@@ -1,6 +1,7 @@
 import os
 import pandas as pd
-from services import db_engine
+from dao.db import engine as db_engine
+
 
 def retrieve_matchups_df() -> pd.DataFrame:
   if db_engine:
