@@ -25,8 +25,8 @@ class OddsCollectionPipeline:
     def close_spider(self, spider):
         df = pd.DataFrame(self.games)
         if isinstance(spider, SportsBookMoneylineSpider):
-            df.to_csv("../data/moneyline.csv", index=False)
+            df.to_csv("../data/odds_raw/moneyline.csv", index=False)
         elif isinstance(spider, SportsBookSpreadSpider):
-            df.to_csv("../data/spreads.csv", index=False)
+            df.to_csv("../data/odds_raw/spreads.csv", index=False)
         elif isinstance(spider, SportsBookOverUnderSpider):
-            df.to_csv("../data/over_under.csv", index=False)
+            df.to_csv("../data/odds_raw/over_under.csv", index=False)
