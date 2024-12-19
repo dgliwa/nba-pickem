@@ -5,7 +5,7 @@ from datetime import datetime
 from dao import retrieve_games_df, retrieve_matchups_df
 
 class NbaGamesSpider(scrapy.Spider):
-    download_delay = 1.0
+    download_delay = 0.75
     name = "nba_games"
     allowed_domains = ["stats.nba.com"]
     start_urls = ["https://stats.nba.com"]
