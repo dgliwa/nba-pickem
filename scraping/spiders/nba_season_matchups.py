@@ -1,10 +1,8 @@
 import scrapy
 
 import logging
-import pandas as pd
-import os
 from datetime import datetime
-from odds_collection.data import retrieve_games_df, retrieve_matchups_df, retrieve_teams_df
+from scraping.data import retrieve_games_df, retrieve_matchups_df, retrieve_teams_df
 
 class NbaSeasonMatchupsSpider(scrapy.Spider):
     download_delay = 0.75

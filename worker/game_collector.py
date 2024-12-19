@@ -2,7 +2,7 @@ from celery import shared_task
 from twisted.internet import defer
 from scrapy.crawler import CrawlerRunner
 from scrapy.utils.project import get_project_settings
-from odds_collection.spiders import NbaSeasonMatchupsSpider, NbaGamesSpider
+from scraping.spiders import NbaSeasonMatchupsSpider, NbaGamesSpider
 from crochet import setup, wait_for
 from worker.game_calculator import calculate_game_data
 

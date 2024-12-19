@@ -2,7 +2,7 @@ import logging
 import scrapy
 
 from datetime import datetime
-from odds_collection.data import retrieve_games_df, retrieve_matchups_df
+from scraping.data import retrieve_games_df, retrieve_matchups_df
 
 class NbaGamesSpider(scrapy.Spider):
     download_delay = 1.0
