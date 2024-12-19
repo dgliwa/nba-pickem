@@ -2,7 +2,7 @@ import scrapy
 
 import logging
 from datetime import datetime
-from scraping.data import retrieve_matchups_df, retrieve_teams_df
+from dao import retrieve_matchups_df, retrieve_teams_df
 
 class NbaSeasonMatchupsSpider(scrapy.Spider):
     download_delay = 0.75

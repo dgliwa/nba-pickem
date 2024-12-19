@@ -14,7 +14,7 @@ from scraping.spiders import NbaTeamsSpider
 from scraping.spiders import SportsBookMoneylineSpider
 from scraping.spiders import SportsBookOverUnderSpider
 from scraping.spiders import SportsBookSpreadSpider
-from scraping.data import save_games_df, save_teams_df, save_matchups_df
+from dao import save_games_df, save_teams_df, save_matchups_df
 
 
 class OddsCollectionPipeline:

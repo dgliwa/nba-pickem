@@ -5,18 +5,20 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import pickle
 from services import redis_client
+from dao import retrieve_games_df
 
 
 @shared_task(ignore_result=True)
 def predict_todays_games():
   model = load_model()
   teams = load_teams()
-  previous_games = load_previous_game_data()
+  previous_games = retrieve_games_df().sort_values(by="GAME_DATE_EST")
   games_response = retrieve_todays_games()
   todays_games = calculate_todays_game_df(games_response, previous_games)
-  todays_games = calculate_game_predictions(todays_games, model)
-  todays_games = combine_team_data_with_predictions(teams, todays_games)
-  save_predictions(todays_games)
+  if not todays_games.empty:
+    todays_games = calculate_game_predictions(todays_games, model)
+    todays_games = combine_team_data_with_predictions(teams, todays_games)
+    save_predictions(todays_games)
 
 
 def load_model():
@@ -25,10 +27,6 @@ def load_model():
 
 def load_teams():
   return pd.read_csv('data/raw/nba_teams.csv')
-
-
-def load_previous_game_data():
-  return pd.read_csv('data/processed/nba_games.csv')
 
 
 def retrieve_todays_games():
