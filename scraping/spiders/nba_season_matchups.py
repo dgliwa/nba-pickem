@@ -21,8 +21,7 @@ class NbaSeasonMatchupsSpider(scrapy.Spider):
         "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:70.0) Gecko/20100101 Firefox/70.0",
     }
 
-    STARTING_YEAR = 2024
-    # STARTING_YEAR = 2017
+    STARTING_YEAR = 2017
 
     def __init__(self):
         self.log("initializing nba season matchups spider", level=logging.INFO)
