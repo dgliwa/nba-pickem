@@ -5,8 +5,7 @@ import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import pickle
-from services import redis_client
-from dao import retrieve_games_df, save_game_predictions_df, retrieve_game_predictions_df
+from dao import redis_client, retrieve_games_df, save_game_predictions_df, retrieve_game_predictions_df, retrieve_teams_df
 
 
 @shared_task(ignore_result=True)
@@ -15,28 +14,22 @@ def predict_todays_games():
     current_date = datetime.now().date()
     if not existing_predictions[existing_predictions["GAME_DATE_EST"] == np.datetime64(current_date)].empty:
         return
-    model = load_model()
-    teams = load_teams()
+    model = _load_model()
+    teams = retrieve_teams_df()
 
     previous_games = retrieve_games_df().sort_values(by="GAME_DATE_EST")
-    games_response = retrieve_todays_games()
-    todays_games = calculate_todays_game_df(games_response, previous_games)
+    games_response = _retrieve_todays_games()
+    todays_games = _calculate_todays_game_df(games_response, previous_games)
     if not todays_games.empty:
-        todays_games = calculate_game_predictions(todays_games, model)
-        save_predictions_to_db(todays_games)
-        todays_games = combine_team_data_with_predictions(teams, todays_games)
-        cache_predictions(todays_games)
+        todays_games = _calculate_game_predictions(todays_games, model)
+        _save_predictions_to_db(todays_games)
 
 
-def load_model():
+def _load_model():
     return pickle.load(open('worker/nba_model.pkl', 'rb'))
 
 
-def load_teams():
-    return pd.read_csv('data/raw/nba_teams.csv')
-
-
-def retrieve_todays_games():
+def _retrieve_todays_games():
     HEADERS = {
         "Referer": "stats.nba.com",
         "Content-Type": "application/json",
@@ -54,7 +47,7 @@ def retrieve_todays_games():
     return requests.get(url, headers=HEADERS).json()
 
 
-def calculate_todays_game_df(games_response, previous_games):
+def _calculate_todays_game_df(games_response, previous_games):
     results = games_response['resultSets']
     game_headers = results[0]
     eastern_standings = results[4]
@@ -101,9 +94,9 @@ def calculate_todays_game_df(games_response, previous_games):
             (previous_games['HOME_TEAM_ID'] == away_team_id) | (previous_games["AWAY_TEAM_ID"] == away_team_id))])
         away_b2b = away_yesterday_game_count > 0
 
-        home_last_10_win_pct = get_last_n_win_pct(
+        home_last_10_win_pct = _get_last_n_win_pct(
             home_team_id, 10, previous_games)
-        away_last_10_win_pct = get_last_n_win_pct(
+        away_last_10_win_pct = _get_last_n_win_pct(
             away_team_id, 10, previous_games)
 
         games.append({
@@ -124,7 +117,7 @@ def calculate_todays_game_df(games_response, previous_games):
     return pd.DataFrame(games)
 
 
-def get_last_n_win_pct(team_id, n, previous_games):
+def _get_last_n_win_pct(team_id, n, previous_games):
     _game = previous_games[(previous_games['HOME_TEAM_ID'] == team_id) | (
         previous_games['AWAY_TEAM_ID'] == team_id)]
     _game['IS_HOME'] = _game['HOME_TEAM_ID'] == team_id
@@ -132,7 +125,7 @@ def get_last_n_win_pct(team_id, n, previous_games):
     return _game["WIN_PRCT"].tail(n).mean()
 
 
-def calculate_game_predictions(games, model):
+def _calculate_game_predictions(games, model):
     model_cols = [
         "GAME_DATETIME",
         "HOME_TEAM_ID",
@@ -150,32 +143,5 @@ def calculate_game_predictions(games, model):
     return games
 
 
-def save_predictions_to_db(todays_games):
+def _save_predictions_to_db(todays_games):
     save_game_predictions_df(todays_games)
-
-
-def combine_team_data_with_predictions(teams, games_with_predictions):
-    games_with_predictions = games_with_predictions.merge(
-        teams, left_on="HOME_TEAM_ID", right_on="TEAM_ID")
-    games_with_predictions = games_with_predictions.merge(
-        teams, left_on="AWAY_TEAM_ID", right_on="TEAM_ID", suffixes=("_HOME", "_AWAY"))
-    games_with_predictions.drop(
-        columns=["TEAM_ID_HOME", "TEAM_ID_AWAY"], inplace=True)
-    games_with_predictions["WINNER"] = games_with_predictions.apply(
-        prettify_winner, axis=1)
-    games_with_predictions["GAME_DATE_EST"] = pd.to_datetime(
-        games_with_predictions["GAME_DATETIME"], unit='ns').dt.strftime('%Y-%m-%d')
-
-    return games_with_predictions[["GAME_DATE_EST", "ABBREVIATION_HOME", "NICKNAME_HOME", "ABBREVIATION_AWAY", "NICKNAME_AWAY", "WINNER"]]
-
-
-def prettify_winner(row):
-    if row["PREDICTION"] == 1:
-        return f"{row['ABBREVIATION_HOME']} {row['NICKNAME_HOME']}"
-    else:
-        return f"{row['ABBREVIATION_AWAY']} {row['NICKNAME_AWAY']}"
-
-
-def cache_predictions(todays_games):
-    todays_games_json = todays_games.to_json(orient='records')
-    redis_client.setex('todays_games', 3600, todays_games_json)

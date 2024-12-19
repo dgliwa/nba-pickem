@@ -22,6 +22,8 @@ def upgrade() -> None:
     op.create_table(
         'game_predictions',
         sa.Column('game_id', sa.String, primary_key=True),
+        sa.Column('home_team_id', sa.String, sa.ForeignKey('teams.team_id'), nullable=False),
+        sa.Column('away_team_id', sa.String, sa.ForeignKey('teams.team_id'), nullable=False),
         sa.Column('predicted_home_team_wins', sa.Boolean, nullable=False),
         sa.Column('game_date_est', sa.DateTime, nullable=False),
     )

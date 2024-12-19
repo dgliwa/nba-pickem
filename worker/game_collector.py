@@ -11,17 +11,17 @@ from datetime import datetime
 
 
 @defer.inlineCallbacks
-def yield_spiders(process) -> None:
+def _yield_spiders(process) -> None:
     yield process.crawl(NbaSeasonMatchupsSpider)
     yield process.crawl(NbaGamesSpider)
 
 
 @wait_for(timeout=None)
-def run_spiders():
+def __run_spiders():
     settings = get_project_settings()
     process = CrawlerRunner(settings)
 
-    d = yield_spiders(process)
+    d = _yield_spiders(process)
     return d
 
 
@@ -32,5 +32,5 @@ def collect_game_data() -> None:
     if not existing_predictions[existing_predictions["GAME_DATE_EST"] == np.datetime64(current_date)].empty:
         return
     setup()
-    run_spiders()
+    __run_spiders()
     predict_todays_games.delay()
