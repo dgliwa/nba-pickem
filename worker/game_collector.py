@@ -4,7 +4,6 @@ from scrapy.crawler import CrawlerRunner
 from scrapy.utils.project import get_project_settings
 from scraping.spiders import NbaSeasonMatchupsSpider, NbaGamesSpider
 from crochet import setup, wait_for
-from worker.game_calculator import calculate_game_data
 
 
 
@@ -25,4 +24,4 @@ def run_spiders():
 def collect_game_data() -> None:
   setup()
   run_spiders()
-  calculate_game_data.delay()
+  # calculate_game_data.delay()

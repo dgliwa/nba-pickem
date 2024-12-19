@@ -3,6 +3,7 @@ import pandas as pd
 import os
 from datetime import datetime
 from worker.game_predictor import predict_todays_games
+from scraping.data import retrieve_games_df
 
 
 @shared_task(ignore_result=True)
@@ -17,8 +18,7 @@ def calculate_game_data():
 
 
 def load_raw_games():
-  games = pd.read_csv('data/raw/nba_games.csv')
-  games["GAME_DATE_EST"] = pd.to_datetime(games["GAME_DATE_EST"])
+  games = retrieve_games_df()
   games["GAME_DATETIME"] = games["GAME_DATE_EST"].astype(int)
   current_year = datetime.now().year
   if datetime.now().month <= 8:

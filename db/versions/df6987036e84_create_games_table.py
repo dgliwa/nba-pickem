@@ -9,7 +9,6 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy import DateTime
 
 
 # revision identifiers, used by Alembic.
@@ -33,7 +32,11 @@ def upgrade() -> None:
         sa.Column('home_home_win_pct', sa.Numeric, nullable=False),
         sa.Column('away_win_pct', sa.Numeric, nullable=False),
         sa.Column('away_away_win_pct', sa.Numeric, nullable=False),
-        sa.Column('home_team_wins', sa.Boolean, nullable=False),
+        sa.Column('last_10_home_win_pct', sa.Numeric, nullable=True),
+        sa.Column('last_10_away_win_pct', sa.Numeric, nullable=True),
+        sa.Column('home_team_b2b', sa.Boolean, nullable=True),
+        sa.Column('away_team_b2b', sa.Boolean, nullable=True),
+        sa.Column('home_team_wins', sa.Boolean, nullable=True),
     )
 
 def downgrade():

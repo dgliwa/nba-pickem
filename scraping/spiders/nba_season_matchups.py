@@ -2,7 +2,7 @@ import scrapy
 
 import logging
 from datetime import datetime
-from scraping.data import retrieve_games_df, retrieve_matchups_df, retrieve_teams_df
+from scraping.data import retrieve_matchups_df, retrieve_teams_df
 
 class NbaSeasonMatchupsSpider(scrapy.Spider):
     download_delay = 0.75
@@ -21,12 +21,12 @@ class NbaSeasonMatchupsSpider(scrapy.Spider):
         "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:70.0) Gecko/20100101 Firefox/70.0",
     }
 
-    STARTING_YEAR = 2017
+    STARTING_YEAR = 2024
+    # STARTING_YEAR = 2017
 
     def __init__(self):
         self.log("initializing nba season matchups spider", level=logging.INFO)
         self.matchups = retrieve_matchups_df()
-        self.nba_games = retrieve_games_df()
 
         self.teams = retrieve_teams_df()
         super().__init__()
@@ -55,7 +55,7 @@ class NbaSeasonMatchupsSpider(scrapy.Spider):
         for row in jsonresponse.get("resultSets")[0].get("rowSet"):
             date = row[0].split()[0]
             game_date = datetime.strptime(date, "%m/%d/%Y").strftime("%Y-%m-%d")
-            if len(self.nba_games) > 0 and row[1] in self.nba_games["GAME_ID"].values:
+            if len(self.matchups) > 0 and row[1] in self.matchups["GAME_ID"].values:
                 continue
             games.append({ "SEASON": year, "GAME_ID": row[1], "TEAM_ID": team_id, "GAME_DATE_EST": game_date })
         return games
