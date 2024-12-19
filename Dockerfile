@@ -1,6 +1,9 @@
 FROM python:3.11-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
+ARG CELERY_BROKER_URL
+RUN echo "CELERY_BROKER_URL=$CELERY_BROKER_URL"
+
 # Change the working directory to the `app` directory
 WORKDIR /app
 
