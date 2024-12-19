@@ -5,6 +5,7 @@
 
 from odds_collection.spiders.nba_games import NbaGamesSpider
 from odds_collection.spiders.nba_season_matchups import NbaSeasonMatchupsSpider
+from odds_collection.spiders.nba_teams import NbaTeamsSpider
 from odds_collection.spiders.sports_book_moneyline import SportsBookMoneylineSpider
 from odds_collection.spiders.sports_book_spread import SportsBookSpreadSpider
 from odds_collection.spiders.sports_book_over_under import SportsBookOverUnderSpider
@@ -12,6 +13,7 @@ from odds_collection.spiders.sports_book_over_under import SportsBookOverUnderSp
 __all__ = [
   "NbaGamesSpider",
   "NbaSeasonMatchupsSpider",
+  "NbaTeamsSpider",
   "SportsBookMoneylineSpider",
   "SportsBookSpreadSpider",
   "SportsBookOverUnderSpider"
