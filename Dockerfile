@@ -15,6 +15,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 ADD ./scrapy.cfg /app/scrapy.cfg
 ADD ./web /app/web
 ADD ./worker /app/worker
+ADD ./services /app/services
 ADD ./odds_collection /app/odds_collection
 ADD ./pyproject.toml /app
 ADD ./uv.lock /app
