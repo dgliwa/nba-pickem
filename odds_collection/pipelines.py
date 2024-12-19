@@ -56,4 +56,4 @@ class OddsCollectionPipeline:
             else:
                 df.to_csv("data/raw/nba_games.csv", index=False, mode="a", header=False)
         elif isinstance(spider, NbaTeamsSpider):
-            df.to_csv("data/nba_teams.csv", index=False)
+            df.to_csv("data/raw/nba_teams.csv", index=False)

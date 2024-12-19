@@ -35,7 +35,7 @@ class NbaSeasonMatchupsSpider(scrapy.Spider):
         else:
             self.nba_games = pd.DataFrame()
 
-        self.teams = pd.read_csv("data/teams.csv")
+        self.teams = pd.read_csv("data/raw/nba_teams.csv")
         super().__init__()
 
     def start_requests(self):
