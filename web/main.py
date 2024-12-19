@@ -20,7 +20,7 @@ GAMES = [
 
 @app.get("/")
 def index():
-  main.add.delay(5, 5)
+  main.collect_game_data.delay()
   return Titled(
     "NBA Pick'em",
     Div(
