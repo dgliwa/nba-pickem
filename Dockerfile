@@ -13,7 +13,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project
 
 ADD alembic.ini /app/alembic.ini
-ADD db /app/db
+ADD ./dao /app/dao
+ADD ./db /app/db
 ADD ./scrapy.cfg /app/scrapy.cfg
 ADD ./web /app/web
 ADD ./worker /app/worker
