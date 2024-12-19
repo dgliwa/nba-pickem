@@ -22,9 +22,9 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.create_table(
         'games',
-        sa.Column('id', sa.String, primary_key=True),
-        sa.Column('home_team_id', sa.String, sa.ForeignKey('teams.id'), nullable=False),
-        sa.Column('away_team_id', sa.String, sa.ForeignKey('teams.id'), nullable=False),
+        sa.Column('game_id', sa.String, primary_key=True),
+        sa.Column('home_team_id', sa.String, sa.ForeignKey('teams.team_id'), nullable=False),
+        sa.Column('away_team_id', sa.String, sa.ForeignKey('teams.team_id'), nullable=False),
         sa.Column('game_date_est', sa.DateTime, nullable=False),
         sa.Column('season', sa.Integer, nullable=False),
         sa.Column('home_team_points', sa.Integer, nullable=False),

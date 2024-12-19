@@ -4,6 +4,7 @@ import logging
 import pandas as pd
 import os
 from datetime import datetime
+from odds_collection.data import retrieve_games_df, retrieve_matchups_df, retrieve_teams_df
 
 class NbaSeasonMatchupsSpider(scrapy.Spider):
     download_delay = 0.75
@@ -26,17 +27,10 @@ class NbaSeasonMatchupsSpider(scrapy.Spider):
 
     def __init__(self):
         self.log("initializing nba season matchups spider", level=logging.INFO)
-        if os.path.exists("data/raw/nba_season_matchups.csv"):
-            self.matchups = pd.read_csv("data/raw/nba_season_matchups.csv", dtype={"GAME_ID": str})
-        else:
-            self.matchups = pd.DataFrame()
+        self.matchups = retrieve_matchups_df()
+        self.nba_games = retrieve_games_df()
 
-        if os.path.exists("data/raw/nba_games.csv"):
-            self.nba_games = pd.read_csv("data/raw/nba_games.csv", dtype={"GAME_ID": str}).sort_values("GAME_DATE_EST", ascending=False)
-        else:
-            self.nba_games = pd.DataFrame()
-
-        self.teams = pd.read_csv("data/raw/nba_teams.csv")
+        self.teams = retrieve_teams_df()
         super().__init__()
 
     def start_requests(self):

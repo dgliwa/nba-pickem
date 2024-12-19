@@ -21,7 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.create_table(
         'teams',
-        sa.Column('id', sa.String, primary_key=True),
+        sa.Column('team_id', sa.String, primary_key=True),
         sa.Column('league_id', sa.String(2), nullable=False),
         sa.Column('abbreviation', sa.String(3), nullable=False),
         sa.Column('city', sa.String(120), nullable=False),

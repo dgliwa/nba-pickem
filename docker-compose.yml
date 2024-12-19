@@ -11,7 +11,7 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - CELERY_BROKER_URL=redis://redis:6379
-      - DB_URL=postgresql://postgres:postgres@db:5433/postgres
+      - DB_URL=postgresql://postgres:postgres@db:5432/postgres
 
   celery:
     build: .

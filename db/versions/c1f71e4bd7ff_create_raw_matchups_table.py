@@ -24,7 +24,7 @@ def upgrade() -> None:
         sa.Column('game_id', sa.String, primary_key=True),
         sa.Column('season', sa.Integer, nullable=False),
         sa.Column('game_date_est', sa.DateTime, nullable=False),
-        sa.Column('team_id', sa.String, sa.ForeignKey('teams.id'), nullable=False),
+        sa.Column('team_id', sa.String, sa.ForeignKey('teams.team_id'), nullable=False),
     )
 
 
