@@ -1,8 +1,7 @@
 import json
 from datetime import datetime
 import numpy as np
-import pandas as pd
-from dao import retrieve_game_predictions_df, retrieve_teams_df, redis_client
+from dao import retrieve_game_predictions_df, retrieve_teams_df, redis_client, retrieve_game_predictions_with_results
 from worker import collect_game_data
 
 
@@ -23,6 +22,10 @@ def assemble_todays_predictions():
     formatted_predictions = _combine_team_data_with_predictions(teams, todays_predictions)
     _cache_predictions(formatted_predictions)
     return formatted_predictions.to_dict(orient='records')
+
+
+def get_historical_accuracy():
+    return retrieve_game_predictions_with_results()
 
 
 def _combine_team_data_with_predictions(teams, game_predictions):
