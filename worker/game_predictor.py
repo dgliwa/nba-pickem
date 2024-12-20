@@ -5,20 +5,19 @@ import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import pickle
-from dao import redis_client, retrieve_games_df, save_game_predictions_df, retrieve_game_predictions_df, retrieve_teams_df
+from dao import redis_client, retrieve_games_df, save_game_predictions_df, retrieve_game_predictions_df
 
 
 @shared_task(ignore_result=True)
-def predict_todays_games():
+def predict_todays_games(prediction_date=datetime.now(ZoneInfo('US/Eastern')).date()):
     existing_predictions = retrieve_game_predictions_df()
-    current_date = datetime.now().date()
-    if not existing_predictions[existing_predictions["GAME_DATE_EST"] == np.datetime64(current_date)].empty:
+    if not existing_predictions[existing_predictions["GAME_DATE_EST"] == np.datetime64(prediction_date)].empty:
         return
     model = _load_model()
-    teams = retrieve_teams_df()
 
     previous_games = retrieve_games_df().sort_values(by="GAME_DATE_EST")
-    games_response = _retrieve_todays_games()
+    previous_games = previous_games[previous_games["GAME_DATE_EST"] < np.datetime64(prediction_date)]
+    games_response = _retrieve_todays_games(prediction_date)
     todays_games = _calculate_todays_game_df(games_response, previous_games)
     if not todays_games.empty:
         todays_games = _calculate_game_predictions(todays_games, model)
@@ -29,7 +28,7 @@ def _load_model():
     return pickle.load(open('worker/nba_model.pkl', 'rb'))
 
 
-def _retrieve_todays_games():
+def _retrieve_todays_games(prediction_date):
     HEADERS = {
         "Referer": "stats.nba.com",
         "Content-Type": "application/json",
@@ -40,9 +39,8 @@ def _retrieve_todays_games():
         "Origin": "https://stats.nba.com",
         "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:70.0) Gecko/20100101 Firefox/70.0",
     }
-    eastern = ZoneInfo('US/Eastern')
-    current_date = datetime.now(eastern).strftime('%m/%d/%Y')
-    url = f"https://stats.nba.com/stats/scoreboardV2?DayOffset=0&LeagueID=00&gameDate={current_date}"
+    formatted_date = prediction_date.strftime('%m/%d/%Y')
+    url = f"https://stats.nba.com/stats/scoreboardV2?DayOffset=0&LeagueID=00&gameDate={formatted_date}"
 
     return requests.get(url, headers=HEADERS).json()
 
