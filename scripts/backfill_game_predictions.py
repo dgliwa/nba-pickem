@@ -1,3 +1,10 @@
+"""
+To run:
+
+CELERY_BROKER_URL=******
+DB_URL=******
+uv run python -m scripts.backfill_game_predictions 2024-12-10 2024-12-29
+"""
 from datetime import datetime, timedelta, date
 import sys
 
