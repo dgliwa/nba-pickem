@@ -1,6 +1,6 @@
 from fasthtml import FastHTML
 from fasthtml.common import *
-from services import assemble_todays_predictions
+from services import assemble_todays_predictions, get_historical_accuracy
 
 
 app = FastHTML(hdrs=picolink)
@@ -8,11 +8,20 @@ app = FastHTML(hdrs=picolink)
 
 @app.get("/")
 def index():
+    historical_accuracy = _retrieve_historical_accuracy()
     todays_games = assemble_todays_predictions()
     if not todays_games:
-        return Titled("NBA Pick'em", P("No games computed yet. Check back in a few minutes."))
+        return Titled(
+            "NBA Pick'em",
+            historical_accuracy,
+            Div(
+                P("No games computed yet. Check back in a few minutes.")
+            )
+        )
 
-    return Titled("NBA Pick'em",
+    return Titled(
+        "NBA Pick'em",
+        historical_accuracy,
         Div(
             P("Here are today's picks"),
             Grid(
@@ -32,3 +41,16 @@ def index():
             ]
         )
     )
+
+def _retrieve_historical_accuracy():
+    accuracy = get_historical_accuracy()
+    return Article(
+        H1("Pick Performance in 2024"),
+        P(f"Total Games: {accuracy["total_games"]}"),
+        P(f"Correct Predictions: {accuracy["correct_predictions"]}"),
+        P(f"% Correct: {accuracy["correct_predictions"] / accuracy["total_games"]}"),
+    )
+    
+
+def _retrieve_game_predictions(game_date):
+    pass
