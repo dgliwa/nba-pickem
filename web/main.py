@@ -1,6 +1,8 @@
 from fasthtml import FastHTML
 from fasthtml.common import *
-from services import assemble_todays_predictions, get_historical_accuracy
+from services import predictions_for_date, get_historical_accuracy
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 
 app = FastHTML(hdrs=picolink)
@@ -9,7 +11,7 @@ app = FastHTML(hdrs=picolink)
 @app.get("/")
 def index():
     historical_accuracy = _retrieve_historical_accuracy()
-    todays_games = assemble_todays_predictions()
+    todays_games = _retrieve_game_predictions(datetime.now(ZoneInfo('US/Eastern')).date())
     if not todays_games:
         return Titled(
             "NBA Pick'em",
@@ -53,4 +55,4 @@ def _retrieve_historical_accuracy():
     
 
 def _retrieve_game_predictions(game_date):
-    pass
+    return predictions_for_date(game_date)
