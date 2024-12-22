@@ -7,6 +7,7 @@ from crochet import setup, wait_for
 import numpy as np
 from worker.game_predictor import predict_todays_games
 from dao import retrieve_game_predictions_df
+from zoneinfo import ZoneInfo
 from datetime import datetime
 
 
@@ -27,10 +28,10 @@ def __run_spiders():
 
 @shared_task(ignore_result=True)
 def collect_game_data() -> None:
-    existing_predictions = retrieve_game_predictions_df()
-    current_date = datetime.now().date()
-    if not existing_predictions[existing_predictions["GAME_DATE_EST"] == np.datetime64(current_date)].empty:
+    game_date = datetime.now(ZoneInfo('US/Eastern')).date()
+    existing_predictions = retrieve_game_predictions_df(game_date)
+    if not existing_predictions[existing_predictions["GAME_DATE_EST"] == np.datetime64(game_date)].empty:
         return
     setup()
     __run_spiders()
-    predict_todays_games.delay()
+    predict_todays_games.delay(game_date)

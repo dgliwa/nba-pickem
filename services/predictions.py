@@ -16,11 +16,11 @@ def predictions_for_date(game_date=datetime.now(ZoneInfo('US/Eastern')).date()):
 
     todays_predictions = predictions[predictions["GAME_DATE_EST"] == np.datetime64(game_date)]
     if todays_predictions.empty:
-        # collect_game_data.delay()
+        collect_game_data.delay()
         return []
 
     formatted_predictions = _combine_team_data_with_predictions(teams, todays_predictions)
-    _cache_predictions(formatted_predictions)
+    _cache_predictions(formatted_predictions, game_date)
     return formatted_predictions.to_dict(orient='records')
 
 

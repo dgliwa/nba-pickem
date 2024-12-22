@@ -10,7 +10,7 @@ from dao import redis_client, retrieve_games_df, save_game_predictions_df, retri
 
 @shared_task(ignore_result=True)
 def predict_todays_games(prediction_date=datetime.now(ZoneInfo('US/Eastern')).date()):
-    existing_predictions = retrieve_game_predictions_df()
+    existing_predictions = retrieve_game_predictions_df(prediction_date)
     if not existing_predictions[existing_predictions["GAME_DATE_EST"] == np.datetime64(prediction_date)].empty:
         return
     model = _load_model()
