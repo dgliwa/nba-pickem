@@ -4,17 +4,30 @@ from dao.db import engine as db_engine
 from sqlalchemy import text
 
 
-def retrieve_game_predictions_df() -> pd.DataFrame:
+def retrieve_game_predictions_df(game_date) -> pd.DataFrame:
     if db_engine:
         with db_engine.connect() as con:
-            query = """
+            query = f"""
                 SELECT
-                GAME_ID,
-                HOME_TEAM_ID,
-                AWAY_TEAM_ID,
-                GAME_DATE_EST,
-                PREDICTED_HOME_TEAM_WINS
-                FROM GAME_PREDICTIONS
+                gp.GAME_ID,
+                gp.HOME_TEAM_ID,
+                gp.AWAY_TEAM_ID,
+                gp.GAME_DATE_EST,
+                gp.PREDICTED_HOME_TEAM_WINS,
+                g.HOME_TEAM_POINTS,
+                g.AWAY_TEAM_POINTS,
+                g.HOME_WIN_PCT,
+                g.HOME_HOME_WIN_PCT,
+                g.AWAY_WIN_PCT,
+                g.AWAY_AWAY_WIN_PCT,
+                g.HOME_LAST_10_WIN_PCT,
+                g.AWAY_LAST_10_WIN_PCT,
+                g.HOME_TEAM_B2B,
+                g.AWAY_TEAM_B2B,
+                g.HOME_TEAM_WINS
+                FROM GAME_PREDICTIONS gp
+                LEFT JOIN GAMES g ON gp.GAME_ID = g.GAME_ID
+                WHERE gp.GAME_DATE_EST = '{game_date.strftime('%Y-%m-%d')}'
             """
             df = pd.read_sql(query, con)
             df.columns = [c.upper() for c in df.columns]
