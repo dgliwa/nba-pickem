@@ -14,7 +14,7 @@ from scraping.spiders import NbaTeamsSpider
 from scraping.spiders import SportsBookMoneylineSpider
 from scraping.spiders import SportsBookOverUnderSpider
 from scraping.spiders import SportsBookSpreadSpider
-from dao import save_games_df, save_teams_df, save_matchups_df
+from dao import save_games_df, save_teams_df, save_matchups_df, save_moneylines_df
 
 
 class OddsCollectionPipeline:
@@ -33,10 +33,7 @@ class OddsCollectionPipeline:
             return
         df = pd.DataFrame(self.games)
         if isinstance(spider, SportsBookMoneylineSpider):
-            if not os.path.exists("data/raw/odds/moneyline.csv"):
-                df.to_csv("data/raw/odds/moneyline.csv", index=False)
-            else:
-                df.to_csv("data/raw/odds/moneyline.csv", index=False, mode="a", header=False)
+            save_moneylines_df(df)
         elif isinstance(spider, SportsBookSpreadSpider):
             if not os.path.exists("data/raw/odds/spreads.csv"):
                 df.to_csv("data/raw/odds/spread.csv", index=False)
@@ -48,7 +45,6 @@ class OddsCollectionPipeline:
             else:
                 df.to_csv("data/raw/odds/over_under.csv", index=False, mode="a", header=False)
         elif isinstance(spider, NbaSeasonMatchupsSpider):
-            spider.logger.info("Saving matchups")
             save_matchups_df(df)
         elif isinstance(spider, NbaGamesSpider):
             save_games_df(df)

@@ -2,7 +2,7 @@ from celery import shared_task
 from twisted.internet import defer
 from scrapy.crawler import CrawlerRunner
 from scrapy.utils.project import get_project_settings
-from scraping.spiders import NbaSeasonMatchupsSpider, NbaGamesSpider
+from scraping.spiders import NbaSeasonMatchupsSpider, NbaGamesSpider, SportsBookMoneylineSpider
 from crochet import setup, wait_for
 import numpy as np
 from worker.game_predictor import predict_todays_games
@@ -15,6 +15,7 @@ from datetime import datetime
 def _yield_spiders(process) -> None:
     yield process.crawl(NbaSeasonMatchupsSpider)
     yield process.crawl(NbaGamesSpider)
+    yield process.crawl(SportsBookMoneylineSpider)
 
 
 @wait_for(timeout=None)

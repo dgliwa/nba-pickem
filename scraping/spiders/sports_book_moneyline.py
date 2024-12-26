@@ -1,6 +1,7 @@
+import logging
 import scrapy
-import os
 import pandas as pd
+from dao import retrieve_moneylines_df, retrieve_games_df, retrieve_teams_df
 
 SPORTSBOOKS = [
     "fanduel",
@@ -17,24 +18,21 @@ class SportsBookMoneylineSpider(scrapy.Spider):
     start_urls = ["https://sportsbookreview.com"]
 
     def __init__(self):
-        if os.path.exists("data/raw/nba_games.csv"):
-            self.nba_games = pd.read_csv("data/raw/nba_games.csv", dtype={"GAME_ID": str}).sort_values("GAME_DATE_EST")
+        self.log("initializing moneylines spider", level=logging.INFO)
+        self.teams = retrieve_teams_df()
+        self.nba_games = retrieve_games_df().sort_values(by="GAME_DATE_EST")
+        self.moneylines = retrieve_moneylines_df().sort_values(by="GAME_DATE_EST")
 
-        if os.path.exists("data/raw/odds/moneyline.csv"):
-            self.moneylines = pd.read_csv("data/raw/odds/moneyline.csv", dtype={"GAME_ID": str}).sort_values("date")
-        else:
-            self.moneylines = pd.DataFrame()
         super().__init__()
-
 
     def start_requests(self):
         self.nba_games = self.nba_games[self.nba_games["SEASON"] >= 2019]
         if len(self.moneylines) > 0:
-            self.nba_games = self.nba_games[~self.nba_games["GAME_DATE_EST"].isin(self.moneylines["date"].unique())]
+            self.nba_games = self.nba_games[~self.nba_games["GAME_DATE_EST"].isin(self.moneylines["GAME_DATE_EST"].unique())]
 
         game_dates = self.nba_games["GAME_DATE_EST"].unique()
         for game_date in game_dates:
-            url = f"https://www.sportsbookreview.com/betting-odds/nba-basketball/money-line/full-game/?date={game_date}"
+            url = f"https://www.sportsbookreview.com/betting-odds/nba-basketball/money-line/full-game/?date={game_date.strftime('%Y-%m-%d')}"
             yield scrapy.Request(url=url, callback=self.parse)
 
     def parse(self, response):
@@ -44,21 +42,42 @@ class SportsBookMoneylineSpider(scrapy.Spider):
         games = []
         for row in odds_rows:
             participants = row.xpath(".//span[re:test(@class, 'participant')]/text()")
-            row_df = {"date": date}
+            base_game = {"GAME_DATE_EST": date}
 
-            away, home = [p.get().strip() for p in participants]
-            row_df.update({"away": away, "home": home})
+            away_city, home_city = [p.get().strip() for p in participants]
+            away_team_id = self.translate_city(away_city)
+            home_team_id = self.translate_city(home_city)
+
+            clause = (
+                (self.nba_games["HOME_TEAM_ID"] == home_team_id) &
+                (self.nba_games["AWAY_TEAM_ID"] == away_team_id) &
+                (self.nba_games["GAME_DATE_EST"] == date)
+            )
+            matching_games = self.nba_games[clause]
+            if len(matching_games) != 1:
+                self.log(f"FOUND WRONG NUMBER OF GAMES: {len(matching_games)}", level=logging.INFO)
+                continue
+
+            base_game.update({"GAME_ID": matching_games["GAME_ID"].values[0]})
             for sportsbook in SPORTSBOOKS:
                 away_odds, home_odds = self.parse_odds(sportsbook, row)
-                row_df.update({f"{sportsbook}_away_odds": away_odds, f"{sportsbook}_home_odds": home_odds})
-            games.append(row_df)
+                if not pd.isna(away_odds) and not pd.isna(home_odds):
+                    row_df = {**base_game, "AWAY_ODDS": away_odds, "HOME_ODDS": home_odds, "SPORTSBOOK": sportsbook}
+                    games.append(row_df)
         return games
-
-
 
     def parse_odds(self, sportsbook, odds_row):
         odds = odds_row.xpath(f".//a[re:test(@href, '{sportsbook}')]/div/div/span[@role='button']/span[2]/text()")
-        self.log(f"Odds: {odds}")
         if not odds:
+            self.log(f"No odds for sportsbook: {sportsbook}", level=logging.INFO)
             return (pd.NA, pd.NA)
         return (int(odds[0].get()), int(odds[1].get()))
+
+    def translate_city(self, city):
+        if city.startswith("L.A."):
+            nickname = city.split(" ")[1]
+            team = self.teams[self.teams["NICKNAME"] == nickname]
+            return team["TEAM_ID"].values[0]
+        else:
+            team = self.teams[self.teams["CITY"] == city]
+            return team["TEAM_ID"].values[0]
