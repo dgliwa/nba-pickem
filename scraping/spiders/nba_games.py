@@ -30,8 +30,6 @@ class NbaGamesSpider(scrapy.Spider):
         super().__init__()
 
     def start_requests(self):
-        # breakpoint()
-
         if len(self.games):
             game_dates = self.matchups[~(self.matchups["GAME_DATE_EST"].isin(self.games["GAME_DATE_EST"].unique()))]["GAME_DATE_EST"].unique()
         else:

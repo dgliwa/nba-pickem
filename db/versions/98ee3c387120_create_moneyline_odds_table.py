@@ -25,6 +25,7 @@ def upgrade() -> None:
         sa.Column('sportsbook', sa.String, nullable=False),
         sa.Column('home_odds', sa.Integer, nullable=False),
         sa.Column('away_odds', sa.Integer, nullable=False),
+        sa.Column('game_date_est', sa.DateTime, nullable=False),
     )
 
 def downgrade():
