@@ -1,11 +1,12 @@
 from fasthtml import FastHTML
-from fasthtml.common import Div, P, picolink, Titled, Grid, Article, H1, Button
+from fasthtml.common import Div, P, picolink, Titled, Grid, Article, H1, Button, Link, Details, Summary, Span, Card, Article
 from services import predictions_for_date, get_historical_accuracy
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 
-app = FastHTML(hdrs=picolink)
+colors = Link(rel="stylesheet", href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.colors.min.css")
+app = FastHTML(hdrs=[picolink, colors])
 
 
 @app.get("/")
@@ -25,7 +26,8 @@ def _previous_picks(game_date: str):
 
 
 def _retrieve_game_predictions(game_date):
-    predictions = predictions_for_date(game_date)
+    bet_amount = 10.0
+    predictions = predictions_for_date(game_date, bet_amount)
 
     if not predictions:
         return Div(
@@ -37,25 +39,62 @@ def _retrieve_game_predictions(game_date):
     return Div(
         Div(
             P(f"Here are the picks for {game_date.strftime('%Y-%m-%d')}"),
+            P(f"All winnings calculated on a {bet_amount} bet"),
             Grid(
                 Div("Date", style="font-weight: bold;"),
                 Div("Home Team", style="font-weight: bold;"),
                 Div("Away Team", style="font-weight: bold;"),
-                Div("Winner", style="font-weight: bold;"),
+                Div("Predicted Winner", style="font-weight: bold;"),
+                Div("Actual Winner", style="font-weight: bold;"),
             ),
             *[
-                Grid(
-                    Div(game["GAME_DATE_EST"]),
-                    Div(game["NICKNAME_HOME"]),
-                    Div(game["NICKNAME_AWAY"]),
-                    Div(game["PREDICTED_WINNER"])
-                )
+                _game(game)
                 for game in predictions
             ],
         ),
         _buttons(game_date),
         id="picks"
     )
+
+
+def _game(game):
+    if game["ACTUAL_WINNER"]:
+        return Card(
+            Grid(
+                Div(game["GAME_DATE_EST"]),
+                Div(f"{game['NICKNAME_HOME']} ({game['HOME_ODDS']})"),
+                Div(f"{game['NICKNAME_AWAY']} ({game['AWAY_ODDS']})"),
+                Div(game["PREDICTED_WINNER"]),
+                Div(game["ACTUAL_WINNER"]),
+            ),
+            Grid(
+                Div(Span(f"Winnings: {game['GAME_WINNINGS']}")),
+            ),
+            cls=_bg_class(game)
+        )
+    else:
+        return Card(
+            Div(
+                Grid(
+                    Div(game["GAME_DATE_EST"]),
+                    Div(game["NICKNAME_HOME"]),
+                    Div(game["NICKNAME_AWAY"]),
+                    Div(game["PREDICTED_WINNER"]),
+                    Div(game["ACTUAL_WINNER"]),
+                )
+            )
+        )
+
+
+def _bg_class(game):
+    if game["WIN_AGAINST_MONEYLINE"]:
+        return "pico-background-yellow-100"
+    if game["CORRECT_PREDICTION"]:
+        return "pico-background-jade-500"
+    elif game["CORRECT_PREDICTION"] is False:
+        return "pico-background-red-500"
+    else:
+        return None
 
 
 def _retrieve_historical_accuracy():
