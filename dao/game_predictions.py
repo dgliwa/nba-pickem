@@ -24,9 +24,12 @@ def retrieve_game_predictions_df(game_date) -> pd.DataFrame:
                 g.AWAY_LAST_10_WIN_PCT,
                 g.HOME_TEAM_B2B,
                 g.AWAY_TEAM_B2B,
-                g.HOME_TEAM_WINS
+                g.HOME_TEAM_WINS,
+                mo.HOME_ODDS,
+                mo.AWAY_ODDS
                 FROM GAME_PREDICTIONS gp
                 LEFT JOIN GAMES g ON gp.GAME_ID = g.GAME_ID
+                LEFT JOIN MONEYLINE_ODDS mo ON gp.GAME_ID = mo.GAME_ID AND mo.sportsbook = 'fanduel'
                 WHERE gp.GAME_DATE_EST = '{game_date.strftime('%Y-%m-%d')}'
             """
             df = pd.read_sql(query, con)
@@ -55,19 +58,47 @@ def save_game_predictions_df(game_predictions_df):
             game_predictions_df.to_csv("data/raw/nba_game_predictions.csv", index=False, mode="a", header=False)
 
 
-def retrieve_game_predictions_with_results():
+def retrieve_game_predictions_with_results(bet_amount):
     if db_engine:
         with db_engine.connect() as con:
-            query = """
+            query = f"""
             SELECT
             SUM(CASE WHEN gp.predicted_home_team_wins = g.home_team_wins THEN 1 ELSE 0 END) as CORRECT_PREDICTIONS,
+            SUM(
+                CASE WHEN gp.predicted_home_team_wins AND g.home_team_wins
+                    THEN
+                        CASE WHEN mo.HOME_ODDS IS NULL THEN 0
+                        WHEN mo.HOME_ODDS < 0 THEN {bet_amount} * (100.0 / ABS(mo.HOME_ODDS))
+                        ELSE {bet_amount} * (mo.HOME_ODDS / 100.0) END
+                WHEN NOT gp.predicted_home_team_wins AND NOT g.home_team_wins
+                    THEN
+                        CASE WHEN mo.AWAY_ODDS IS NULL THEN 0
+                        WHEN mo.AWAY_ODDS < 0 THEN {bet_amount} * (100.0 / ABS(mo.AWAY_ODDS))
+                        ELSE {bet_amount} * (mo.AWAY_ODDS / 100.0) END
+                ELSE
+                    -{bet_amount}
+                END
+            ) as PREDICTED_WINNINGS,
+            SUM(
+                CASE WHEN (gp.predicted_home_team_wins AND g.home_team_wins AND mo.HOME_ODDS > 0) OR (NOT gp.predicted_home_team_wins AND NOT g.home_team_wins AND mo.AWAY_ODDS > 0)
+                    THEN 1
+                    ELSE 0
+                    END
+     
+            ) as AGAINST_MONEYLINE_FAVORITE,
             COUNT(*) as TOTAL_GAMES
             FROM game_predictions gp
             JOIN games g ON gp.game_id = g.game_id
+            LEFT JOIN MONEYLINE_ODDS mo ON gp.GAME_ID = mo.GAME_ID AND mo.sportsbook = 'fanduel'
             WHERE g.season = 2024
             """
             results = con.execute(text(query))
-            correct_predictions, total_games = results.one()
-            return {"correct_predictions": correct_predictions, "total_games": total_games}
+            correct_predictions, predicted_winnings, against_moneyline_favorite, total_games = results.one()
+            return {
+                "correct_predictions": correct_predictions,
+                "predicted_winnings": predicted_winnings,
+                "against_moneyline_favorite": against_moneyline_favorite,
+                "total_games": total_games
+            }
     else:
         return {"correct_predictions": 0, "total_games": 0}
