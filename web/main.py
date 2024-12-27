@@ -29,14 +29,14 @@ def _retrieve_game_predictions(game_date):
 
     if not predictions:
         return Div(
-            P(f"No predictions for {game_date.strftime("%Y-%m-%d")}"),
+            P(f"No predictions for {game_date.strftime('%Y-%m-%d')}"),
             _buttons(game_date),
             id="picks"
         )
 
     return Div(
         Div(
-            P(f"Here are the picks for {game_date.strftime("%Y-%m-%d")}"),
+            P(f"Here are the picks for {game_date.strftime('%Y-%m-%d')}"),
             Grid(
                 Div("Date", style="font-weight: bold;"),
                 Div("Home Team", style="font-weight: bold;"),
@@ -48,7 +48,7 @@ def _retrieve_game_predictions(game_date):
                     Div(game["GAME_DATE_EST"]),
                     Div(game["NICKNAME_HOME"]),
                     Div(game["NICKNAME_AWAY"]),
-                    Div(game["WINNER"])
+                    Div(game["PREDICTED_WINNER"])
                 )
                 for game in predictions
             ],
@@ -59,12 +59,15 @@ def _retrieve_game_predictions(game_date):
 
 
 def _retrieve_historical_accuracy():
-    accuracy = get_historical_accuracy()
+    bet_amount = 10.0
+    accuracy = get_historical_accuracy(bet_amount)
     return Article(
         H1("Pick Performance in 2024"),
-        P(f"Total Games: {accuracy["total_games"]}"),
-        P(f"Correct Predictions: {accuracy["correct_predictions"]}"),
-        P(f"% Correct: {accuracy["correct_predictions"] / accuracy["total_games"]}"),
+        P(f"Total Games: {accuracy['total_games']}"),
+        P(f"Correct Predictions: {accuracy['correct_predictions']}"),
+        P(f"% Correct: {accuracy['correct_predictions'] / accuracy['total_games']}"),
+        P(f"Predicted winnings (assuming a ${bet_amount} bet): {accuracy['predicted_winnings']}"),
+        P(f"Correct picks against the moneyline favorite: {accuracy['against_moneyline_favorite']}"),
     )
 
 
