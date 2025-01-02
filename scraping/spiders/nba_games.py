@@ -52,6 +52,10 @@ class NbaGamesSpider(scrapy.Spider):
 
         nba_games = []
         for game in game_headers.get("rowSet"):
+            game_status = game[3]
+            if game_status != 3:
+                continue
+
             game_id = game[2]
             home_team_id = game[6]
             away_team_id = game[7]

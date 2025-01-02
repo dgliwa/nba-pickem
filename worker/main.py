@@ -6,12 +6,13 @@ from celery.schedules import crontab
 from worker.game_collector import collect_game_data
 
 app = Celery('tasks', broker=os.getenv("CELERY_BROKER_URL"))
+app.conf.timezone = 'US/Eastern'
 logger = get_task_logger(__name__)
 
 
 @app.on_after_finalize.connect
 def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(
-        crontab(minute='0'),
+        crontab(minute='16', hour='6-10'),
         collect_game_data.s(),
     )
