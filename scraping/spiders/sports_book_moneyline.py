@@ -21,7 +21,9 @@ class SportsBookMoneylineSpider(scrapy.Spider):
         self.log("initializing moneylines spider", level=logging.INFO)
         self.teams = retrieve_teams_df()
         self.nba_games = retrieve_games_df().sort_values(by="GAME_DATE_EST")
-        self.moneylines = retrieve_moneylines_df().sort_values(by="GAME_DATE_EST")
+        self.moneylines = retrieve_moneylines_df()
+        if len(self.moneylines) > 0:
+            self.moneylines = self.moneylines.sort_values(by="GAME_DATE_EST")
 
         super().__init__()
 
