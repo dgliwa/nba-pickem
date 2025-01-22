@@ -1,16 +1,5 @@
-import logging
-import scrapy
-import pandas as pd
-from dao import retrieve_moneylines_df, retrieve_games_df, retrieve_teams_df
+from dao import retrieve_moneylines_df
 from scraping.spiders.base_sports_book_scraper import BaseSportsBookScraper
-
-SPORTSBOOKS = [
-    "fanduel",
-    "mgm",
-    "draftkings",
-    "caesars",
-    "rivers"
-]
 
 
 class SportsBookMoneylineSpider(BaseSportsBookScraper):
@@ -20,4 +9,8 @@ class SportsBookMoneylineSpider(BaseSportsBookScraper):
         return retrieve_moneylines_df()
 
     def _odds_url(self, game_date):
-        return f"https://www.sportsbookreview.com/betting-odds/nba-basketball/money-line/full-game/?date={game_date.strftime('%Y-%m-%d')}"
+        return f"https://www.sportsbookreview.com/betting-odds/nba-basketball/money-line/full-game/?date=2025-01-21"
+        # return f"https://www.sportsbookreview.com/betting-odds/nba-basketball/money-line/full-game/?date={game_date.strftime('%Y-%m-%d')}"
+
+    def _odds_key(self):
+        return "moneyLineHistory"

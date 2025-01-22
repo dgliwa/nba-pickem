@@ -17,7 +17,7 @@ def retrieve_moneylines_df() -> pd.DataFrame:
 
 
 def save_moneylines_df(moneylines_df):
-    moneylines_df.drop_duplicates(inplace=True, subset=["GAME_ID"]) 
+    moneylines_df.drop_duplicates(inplace=True, subset=["GAME_ID", "SPORTSBOOK"]) 
     if db_engine:
         with db_engine.connect() as con:
             moneylines_df.columns = [c.lower() for c in moneylines_df.columns]
