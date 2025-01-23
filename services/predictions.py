@@ -13,9 +13,9 @@ from worker import collect_game_data
 
 
 def predictions_for_date(game_date=datetime.now(ZoneInfo('US/Eastern')).date(), bet_amount=10.0):
-    games_str = redis_client.get(f"{game_date.strftime('%Y-%m-%d')}_games")
-    if games_str:
-        return json.loads(games_str)
+    # games_str = redis_client.get(f"{game_date.strftime('%Y-%m-%d')}_games")
+    # if games_str:
+    #     return json.loads(games_str)
 
     teams = retrieve_teams_df()
     predictions = retrieve_game_predictions_df(game_date)
@@ -48,6 +48,14 @@ def _combine_team_data_with_predictions(teams, game_predictions, bet_amount):
         [
             "GAME_ID",
             "GAME_DATE_EST",
+            "HOME_WIN_PCT",
+            "HOME_HOME_WIN_PCT",
+            "AWAY_WIN_PCT",
+            "AWAY_AWAY_WIN_PCT",
+            "HOME_TEAM_B2B",
+            "AWAY_TEAM_B2B",
+            "HOME_LAST_10_WIN_PCT",
+            "AWAY_LAST_10_WIN_PCT",
             "ABBREVIATION_HOME",
             "NICKNAME_HOME",
             "ABBREVIATION_AWAY",

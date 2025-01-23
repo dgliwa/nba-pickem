@@ -16,14 +16,14 @@ def retrieve_game_predictions_df(game_date) -> pd.DataFrame:
                 gp.PREDICTED_HOME_TEAM_WINS,
                 g.HOME_TEAM_POINTS,
                 g.AWAY_TEAM_POINTS,
-                g.HOME_WIN_PCT,
-                g.HOME_HOME_WIN_PCT,
-                g.AWAY_WIN_PCT,
-                g.AWAY_AWAY_WIN_PCT,
-                g.HOME_LAST_10_WIN_PCT,
-                g.AWAY_LAST_10_WIN_PCT,
-                g.HOME_TEAM_B2B,
-                g.AWAY_TEAM_B2B,
+                gp.HOME_WIN_PCT,
+                gp.HOME_HOME_WIN_PCT,
+                gp.AWAY_WIN_PCT,
+                gp.AWAY_AWAY_WIN_PCT,
+                gp.HOME_LAST_10_WIN_PCT,
+                gp.AWAY_LAST_10_WIN_PCT,
+                gp.HOME_TEAM_B2B,
+                gp.AWAY_TEAM_B2B,
                 g.HOME_TEAM_WINS,
                 mo.HOME_ODDS,
                 mo.AWAY_ODDS
@@ -46,7 +46,21 @@ def retrieve_game_predictions_df(game_date) -> pd.DataFrame:
 def save_game_predictions_df(game_predictions_df):
     game_predictions_df.drop_duplicates(inplace=True, subset=["GAME_ID"])
     if db_engine:
-        game_predictions_df = game_predictions_df[["GAME_ID", "HOME_TEAM_ID", "AWAY_TEAM_ID", "PREDICTION", "GAME_DATE_EST"]]
+        game_predictions_df = game_predictions_df[[
+            "GAME_ID",
+            "HOME_TEAM_ID",
+            "AWAY_TEAM_ID",
+            "PREDICTION",
+            "GAME_DATE_EST",
+            "HOME_WIN_PCT",
+            "HOME_HOME_WIN_PCT",
+            "AWAY_WIN_PCT",
+            "AWAY_AWAY_WIN_PCT",
+            "HOME_TEAM_B2B",
+            "AWAY_TEAM_B2B",
+            "HOME_LAST_10_WIN_PCT",
+            "AWAY_LAST_10_WIN_PCT"
+        ]]
         game_predictions_df = game_predictions_df.rename({"PREDICTION": "PREDICTED_HOME_TEAM_WINS"}, axis=1)
         with db_engine.connect() as con:
             game_predictions_df.columns = [c.lower() for c in game_predictions_df.columns]

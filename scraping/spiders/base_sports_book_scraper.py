@@ -18,7 +18,7 @@ class BaseSportsBookScraper(scrapy.Spider):
     allowed_domains = ["sportsbookreview.com"]
     start_urls = ["https://sportsbookreview.com"]
 
-    def __init__(self, sportsbooks=SPORTSBOOKS.values):
+    def __init__(self, sportsbooks=SPORTSBOOKS.values()):
         self.log(f"initializing {self.name}", level=logging.INFO)
         self.teams = retrieve_teams_df()
         self.nba_games = retrieve_games_df().sort_values(by="GAME_DATE_EST")

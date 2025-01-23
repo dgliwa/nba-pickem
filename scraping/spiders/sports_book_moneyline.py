@@ -9,8 +9,7 @@ class SportsBookMoneylineSpider(BaseSportsBookScraper):
         return retrieve_moneylines_df()
 
     def _odds_url(self, game_date):
-        return f"https://www.sportsbookreview.com/betting-odds/nba-basketball/money-line/full-game/?date=2025-01-21"
-        # return f"https://www.sportsbookreview.com/betting-odds/nba-basketball/money-line/full-game/?date={game_date.strftime('%Y-%m-%d')}"
+        return f"https://www.sportsbookreview.com/betting-odds/nba-basketball/money-line/full-game/?date={game_date.strftime('%Y-%m-%d')}"
 
     def _odds_key(self):
         return "moneyLineHistory"

@@ -1,5 +1,6 @@
+import json
 from fasthtml import FastHTML
-from fasthtml.common import Div, P, picolink, Titled, Grid, Article, H1, Button, Link, Details, Summary, Span, Card, Article
+from fasthtml.common import Div, P, picolink, Titled, Grid, Article, H1, Button, Link, Details, Summary, Span, Card, Article, Code
 from services import predictions_for_date, get_historical_accuracy
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -58,29 +59,56 @@ def _retrieve_game_predictions(game_date):
 
 
 def _game(game):
+    prediction_keys = [
+        "HOME_WIN_PCT",
+        "HOME_HOME_WIN_PCT",
+        "AWAY_WIN_PCT",
+        "AWAY_AWAY_WIN_PCT",
+        "HOME_TEAM_B2B",
+        "AWAY_TEAM_B2B",
+        "HOME_LAST_10_WIN_PCT",
+        "AWAY_LAST_10_WIN_PCT",
+    ]
     if game["ACTUAL_WINNER"]:
         return Card(
-            Grid(
-                Div(game["GAME_DATE_EST"]),
-                Div(f"{game['NICKNAME_HOME']} ({game['HOME_ODDS']})"),
-                Div(f"{game['NICKNAME_AWAY']} ({game['AWAY_ODDS']})"),
-                Div(game["PREDICTED_WINNER"]),
-                Div(game["ACTUAL_WINNER"]),
+            Details(
+                Summary(
+                    Grid(
+                        Div(game["GAME_DATE_EST"]),
+                        Div(f"{game['NICKNAME_HOME']} ({game['HOME_ODDS']})"),
+                        Div(f"{game['NICKNAME_AWAY']} ({game['AWAY_ODDS']})"),
+                        Div(game["PREDICTED_WINNER"]),
+                        Div(game["ACTUAL_WINNER"]),
+                    ),
+                    Grid(
+                        Div(Span(f"Winnings: {game['GAME_WINNINGS']}")),
+                    ),
+                ),
+                Card(
+                    Code(
+                        json.dumps({ k: game[k] for k in prediction_keys })
+                    )
+                )
             ),
-            Grid(
-                Div(Span(f"Winnings: {game['GAME_WINNINGS']}")),
-            ),
+            
             cls=_bg_class(game)
         )
     else:
         return Card(
-            Div(
-                Grid(
-                    Div(game["GAME_DATE_EST"]),
-                    Div(game["NICKNAME_HOME"]),
-                    Div(game["NICKNAME_AWAY"]),
-                    Div(game["PREDICTED_WINNER"]),
-                    Div(game["ACTUAL_WINNER"]),
+            Details(
+                Summary(
+                    Grid(
+                        Div(game["GAME_DATE_EST"]),
+                        Div(game["NICKNAME_HOME"]),
+                        Div(game["NICKNAME_AWAY"]),
+                        Div(game["PREDICTED_WINNER"]),
+                        Div(game["ACTUAL_WINNER"]),
+                    )
+                ),
+                Card(
+                    Code(
+                        json.dumps({ k: game[k] for k in prediction_keys })
+                    )
                 )
             )
         )
