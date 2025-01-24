@@ -2,6 +2,8 @@ import logging
 import scrapy
 import json
 from dao import retrieve_games_df, retrieve_teams_df
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 SPORTSBOOKS = {
     "fanduel": "fanduel",
@@ -77,9 +79,13 @@ class BaseSportsBookScraper(scrapy.Spider):
             odds_history = odds[self._odds_key()]
             if sportsbook not in self.sportsbooks or not odds_history:
                 continue
-            closing_odds = odds_history[-1]
-            row_df = {**base_game, "AWAY_ODDS": closing_odds["awayOdds"], "HOME_ODDS": closing_odds["homeOdds"], "SPORTSBOOK": sportsbook}
-            games.append(row_df)
+            rows = [
+                {**base_game, "AWAY_ODDS": odds["awayOdds"], "HOME_ODDS": odds["homeOdds"], "SPORTSBOOK": sportsbook, "LINE_DATETIME": datetime.strptime(odds["oddsDate"], "%Y-%m-%dT%H:%M:%S%z")}
+                for odds in odds_history
+            ]
+            # closing_odds = odds_history[-1]
+            # row_df = {**base_game, "AWAY_ODDS": closing_odds["awayOdds"], "HOME_ODDS": closing_odds["homeOdds"], "SPORTSBOOK": sportsbook}
+            games.extend(rows)
                     
         return games
 

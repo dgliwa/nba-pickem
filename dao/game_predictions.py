@@ -29,7 +29,7 @@ def retrieve_game_predictions_df(game_date) -> pd.DataFrame:
                 mo.AWAY_ODDS
                 FROM GAME_PREDICTIONS gp
                 LEFT JOIN GAMES g ON gp.GAME_ID = g.GAME_ID
-                LEFT JOIN MONEYLINE_ODDS mo ON gp.GAME_ID = mo.GAME_ID AND mo.sportsbook = 'fanduel'
+                LEFT JOIN MONEYLINE_ODDS mo ON mo.ID = (SELECT id from MONEYLINE_ODDS WHERE sportsbook = 'fanduel' AND GAME_ID = gp.GAME_ID ORDER BY line_datetime DESC LIMIT 1)
                 WHERE gp.GAME_DATE_EST = '{game_date.strftime('%Y-%m-%d')}'
             """
             df = pd.read_sql(query, con)
@@ -103,7 +103,7 @@ def retrieve_game_predictions_with_results(bet_amount):
             COUNT(*) as TOTAL_GAMES
             FROM game_predictions gp
             JOIN games g ON gp.game_id = g.game_id
-            LEFT JOIN MONEYLINE_ODDS mo ON gp.GAME_ID = mo.GAME_ID AND mo.sportsbook = 'fanduel'
+            LEFT JOIN MONEYLINE_ODDS mo ON mo.ID = (SELECT id from MONEYLINE_ODDS WHERE sportsbook = 'fanduel' AND GAME_ID = gp.GAME_ID ORDER BY line_datetime DESC LIMIT 1)
             WHERE g.season = 2024
             """
             results = con.execute(text(query))
