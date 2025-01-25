@@ -40,16 +40,16 @@ class BaseSportsBookScraper(scrapy.Spider):
         game_dates = self.nba_games["GAME_DATE_EST"].unique()
         for game_date in game_dates:
             url = self._odds_url(game_date)
-            yield scrapy.Request(url=url, callback=self.parse)
+            yield scrapy.Request(url=url, callback=self._parse_games)
 
-    def parse(self, response):
+    def _parse_games(self, response):
         date = response.url.split("=")[-1]
         
         line_data_links = response.xpath(".//a[@data-cy='button-grid-linehistory']/@href").getall()
         for link in line_data_links:
-                yield scrapy.Request(url=f"https://sportsbookreview.com{link}", callback=lambda r: self.parse_game(r, date))
+                yield scrapy.Request(url=f"https://sportsbookreview.com{link}", callback=lambda r: self._parse_game(r, date))
 
-    def parse_game(self, response, date):
+    def _parse_game(self, response, date):
         json_data = response.xpath(".//script[@id='__NEXT_DATA__']/text()").get()
         data = json.loads(json_data)
         game_data_line_history = data["props"]["pageProps"]["lineHistoryModel"]["lineHistory"]
@@ -59,8 +59,8 @@ class BaseSportsBookScraper(scrapy.Spider):
 
         away_city = game_view["awayTeam"]["displayName"]
         home_city = game_view["homeTeam"]["displayName"]
-        away_team_id = self.translate_city(away_city)
-        home_team_id = self.translate_city(home_city)
+        away_team_id = self._translate_city(away_city)
+        home_team_id = self._translate_city(home_city)
 
         clause = (
             (self.nba_games["HOME_TEAM_ID"] == home_team_id) &
@@ -80,7 +80,7 @@ class BaseSportsBookScraper(scrapy.Spider):
             if sportsbook not in self.sportsbooks or not odds_history:
                 continue
             rows = [
-                {**base_game, "AWAY_ODDS": odds["awayOdds"], "HOME_ODDS": odds["homeOdds"], "SPORTSBOOK": sportsbook, "LINE_DATETIME": datetime.strptime(odds["oddsDate"], "%Y-%m-%dT%H:%M:%S%z")}
+                {**base_game, "AWAY_ODDS": odds["awayOdds"], "HOME_ODDS": odds["homeOdds"], "SPORTSBOOK": sportsbook, "LINE_DATETIME": self._parse_odds_date(odds["oddsDate"])}
                 for odds in odds_history
             ]
             # closing_odds = odds_history[-1]
@@ -89,7 +89,13 @@ class BaseSportsBookScraper(scrapy.Spider):
                     
         return games
 
-    def translate_city(self, city):
+    def _parse_odds_date(self, date_str):
+        try:
+            return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S%z")
+        except:
+            return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%f%z")
+
+    def _translate_city(self, city):
         if city.startswith("L.A."):
             nickname = city.split(" ")[1]
             team = self.teams[self.teams["NICKNAME"] == nickname]
@@ -97,7 +103,7 @@ class BaseSportsBookScraper(scrapy.Spider):
         else:
             team = self.teams[self.teams["CITY"] == city]
             return team["TEAM_ID"].values[0]
-    
+
     def _odds_key(self):
         raise NotImplementedError()
 
