@@ -110,7 +110,7 @@ def retrieve_game_predictions_with_results(bet_amount):
             correct_predictions, predicted_winnings, against_moneyline_favorite, total_games = results.one()
             return {
                 "correct_predictions": correct_predictions,
-                "predicted_winnings": predicted_winnings,
+                "predicted_winnings": float(predicted_winnings),
                 "against_moneyline_favorite": against_moneyline_favorite,
                 "total_games": total_games
             }

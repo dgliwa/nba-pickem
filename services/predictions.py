@@ -13,9 +13,9 @@ from worker import collect_game_data
 
 
 def predictions_for_date(game_date=datetime.now(ZoneInfo('US/Eastern')).date(), bet_amount=10.0):
-    # games_str = redis_client.get(f"{game_date.strftime('%Y-%m-%d')}_games")
-    # if games_str:
-    #     return json.loads(games_str)
+    games_str = redis_client.get(f"{game_date.strftime('%Y-%m-%d')}_games")
+    if games_str:
+        return json.loads(games_str)
 
     teams = retrieve_teams_df()
     predictions = retrieve_game_predictions_df(game_date)
@@ -31,7 +31,13 @@ def predictions_for_date(game_date=datetime.now(ZoneInfo('US/Eastern')).date(), 
 
 
 def get_historical_accuracy(bet_amount=10.0):
-    return retrieve_game_predictions_with_results(bet_amount)
+    acc_str = redis_client.get("historical_acuracy")
+    if acc_str:
+        return json.loads(acc_str)
+    historical_accuracy = retrieve_game_predictions_with_results(bet_amount)
+    historical_accuracy_json = json.dumps(historical_accuracy)
+    redis_client.setex("historical_accuracy", 3600, historical_accuracy_json)
+    return historical_accuracy
 
 
 def _combine_team_data_with_predictions(teams, game_predictions, bet_amount):

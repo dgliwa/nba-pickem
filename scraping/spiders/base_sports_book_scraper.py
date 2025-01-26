@@ -83,8 +83,6 @@ class BaseSportsBookScraper(scrapy.Spider):
                 {**base_game, "AWAY_ODDS": odds["awayOdds"], "HOME_ODDS": odds["homeOdds"], "SPORTSBOOK": sportsbook, "LINE_DATETIME": self._parse_odds_date(odds["oddsDate"])}
                 for odds in odds_history
             ]
-            # closing_odds = odds_history[-1]
-            # row_df = {**base_game, "AWAY_ODDS": closing_odds["awayOdds"], "HOME_ODDS": closing_odds["homeOdds"], "SPORTSBOOK": sportsbook}
             games.extend(rows)
                     
         return games
