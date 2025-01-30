@@ -8,6 +8,7 @@ def retrieve_game_predictions_df(game_date) -> pd.DataFrame:
     if db_engine:
         with db_engine.connect() as con:
             query = f"""
+            
                 SELECT
                 gp.GAME_ID,
                 gp.HOME_TEAM_ID,
@@ -116,3 +117,41 @@ def retrieve_game_predictions_with_results(bet_amount):
             }
     else:
         return {"correct_predictions": 0, "total_games": 0}
+
+
+def retrieve_game_probabilities(game_ids):
+    if db_engine:
+        with db_engine.connect() as con:
+            query = f"""
+                SELECT
+                mo.game_date_est,
+                mo.game_id,
+                mo.sportsbook,
+                mo.line_datetime,
+                gp.predicted_home_team_wins,
+                mo.HOME_ODDS,
+                mo.AWAY_ODDS,
+                CASE WHEN mo.HOME_ODDS < 0 
+            	    THEN
+            		    -mo.HOME_ODDS/(-HOME_ODDS + 100.0)
+            	    ELSE
+            		    100.0/(mo.HOME_ODDS + 100.0)
+            	    END as HOME_WIN_PROBABILITY,
+                CASE WHEN mo.AWAY_ODDS < 0
+            	    THEN
+            		    -mo.AWAY_ODDS/(-AWAY_ODDS + 100.0)
+            	    ELSE
+            		    100.0/(mo.AWAY_ODDS + 100.0)
+            	    END as AWAY_WIN_PROBABILITY
+                
+                FROM game_predictions gp
+                JOIN games g ON gp.game_id = g.game_id
+                LEFT JOIN MONEYLINE_ODDS mo ON mo.game_id = g.game_id
+                WHERE gp.GAME_ID IN({','.join([f"'{game_id}'" for game_id in game_ids])})
+                ORDER BY mo.game_date_est, mo.game_id, mo.sportsbook, mo.line_datetime
+            """
+            df = pd.read_sql(query, con)
+            df.columns = [c.upper() for c in df.columns]
+            return df
+    else:
+        return pd.DataFrame()

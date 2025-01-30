@@ -7,18 +7,24 @@ from dao import (
     retrieve_game_predictions_df,
     retrieve_teams_df,
     redis_client,
-    retrieve_game_predictions_with_results
+    retrieve_game_predictions_with_results,
+    retrieve_game_probabilities
 )
 from worker import collect_game_data
 
 
 def predictions_for_date(game_date=datetime.now(ZoneInfo('US/Eastern')).date(), bet_amount=10.0):
-    games_str = redis_client.get(f"{game_date.strftime('%Y-%m-%d')}_games")
-    if games_str:
-        return json.loads(games_str)
+    # games_str = redis_client.get(f"{game_date.strftime('%Y-%m-%d')}_games")
+    # if games_str:
+    #     return json.loads(games_str)
 
     teams = retrieve_teams_df()
     predictions = retrieve_game_predictions_df(game_date)
+
+    game_ids = predictions["GAME_ID"].tolist()
+    game_probabilities = retrieve_game_probabilities(game_ids).apply(_normalize_probabilities, axis=1)
+    if len(game_probabilities):
+        game_probabilities = _generate_evs_from_probabilities(game_probabilities)
 
     predictions_for_date = predictions[predictions["GAME_DATE_EST"] == np.datetime64(game_date)]
     if predictions_for_date.empty:
@@ -121,6 +127,22 @@ def _win_against_moneyline(row):
         return row["CORRECT_PREDICTION"]
     return False
 
+def _generate_evs_from_probabilities(game_probabilities):
+    pass
+
+
+def _normalize_probabilities(row):
+    combined_probability = row["AWAY_WIN_PROBABILITY"] + row["HOME_WIN_PROBABILITY"]
+    predicted_raw_probability = row["HOME_WIN_PROBABILITY"] if row["PREDICTED_HOME_TEAM_WINS"] else row["AWAY_WIN_PROBABILITY"]
+    predicted_normalized_probability = predicted_raw_probability / combined_probability
+    line_date_est = row["LINE_DATETIME"].tz_localize("US/Eastern")
+    return pd.Series({
+        "GAME_ID": row["GAME_ID"],
+        "SPORTSBOOK": row["SPORTSBOOK"],
+        "PREDICTED_PROBABILITY": predicted_normalized_probability,
+        "LINE_DATETIME": line_date_est
+    })
+    
 
 def _cache_predictions(games, game_date):
     todays_games_json = games.to_json(orient='records')
