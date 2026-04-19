@@ -1,0 +1,14 @@
+.gitignore
+  h_0d70a061233905 120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "43135f9f01bbbc0ca22c784df107559dca213d8a",
+  "prompts": {},
+  "humans": {
+    "h_0d70a061233905": {
+      "author": "Derek Gliwa"
+    }
+  }
+}
