@@ -21,16 +21,17 @@ def predictions_for_date(game_date=datetime.now(ZoneInfo('US/Eastern')).date(), 
     teams = retrieve_teams_df()
     predictions = retrieve_game_predictions_df(game_date)
 
-    game_ids = predictions["GAME_ID"].tolist()
-    game_probabilities = retrieve_game_probabilities(game_ids).apply(_normalize_probabilities, axis=1)
-    if len(game_probabilities):
-        game_probabilities = _generate_evs_from_probabilities(game_probabilities)
 
     predictions_for_date = predictions[predictions["GAME_DATE_EST"] == np.datetime64(game_date)]
     if predictions_for_date.empty:
         collect_game_data.delay()
         return []
 
+    game_ids = predictions["GAME_ID"].tolist()
+    game_probabilities = retrieve_game_probabilities(game_ids).apply(_normalize_probabilities, axis=1)
+    if len(game_probabilities):
+        game_probabilities = _generate_evs_from_probabilities(game_probabilities)
+        
     formatted_predictions = _combine_team_data_with_predictions(teams, predictions_for_date, bet_amount)
     _cache_predictions(formatted_predictions, game_date)
     return formatted_predictions.to_dict(orient='records')

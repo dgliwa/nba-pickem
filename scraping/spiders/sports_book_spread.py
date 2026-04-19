@@ -2,12 +2,14 @@ import scrapy
 import os
 import pandas as pd
 
-SPORTSBOOKS = [
-    "fanduel",
-    "mgm",
-    "draftkings",
-    "caesars"
-]
+SPORTSBOOKS = {
+    "fanduel": "fanduel",
+    "mgm": "betmgm",
+    "draftkings": "draftkings",
+    "caesars": "caesars",
+    "rivers": "bet_rivers_ny",
+    "bet365": "bet365",
+}
 
 
 class SportsBookSpreadSpider(scrapy.Spider):
