@@ -1,4 +1,4 @@
-.PHONY: install init extract extract-teams extract-games predict jupyter clean
+.PHONY: install init extract extract-all extract-teams predict predict-date jupyter clean
 
 install:
 	uv pip install -e .
@@ -12,11 +12,11 @@ init-load:
 extract:
 	nba-pickem-extract
 
+extract-all:
+	nba-pickem-extract --all
+
 extract-teams:
 	nba-pickem-extract --teams
-
-extract-games:
-	nba-pickem-extract --games
 
 predict:
 	nba-pickem-predict

@@ -67,6 +67,15 @@ def init_db():
             line_datetime TIMESTAMP
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS seasons (
+            season_year INTEGER PRIMARY KEY,
+            is_regular_season_complete BOOLEAN DEFAULT FALSE,
+            playoffs_start_date DATE,
+            last_extract_at TIMESTAMP,
+            games_loaded INTEGER DEFAULT 0
+        )
+    """)
     conn.close()
 
 
@@ -101,9 +110,19 @@ def get_games(start_date: str | None = None, end_date: str | None = None) -> pd.
     return df
 
 
-def recompute_features() -> pd.DataFrame:
-    """Recompute features (b2b, last_10_win_pct) for all games in the database."""
+def recompute_features(season: int) -> pd.DataFrame:
+    """Recompute features (b2b, last_10_win_pct) for games in a season.
+    
+    Args:
+        season: The season year to recompute features for (e.g., 2025 for 2025-2026)
+    """
     all_games = get_games()
+    
+    if all_games.empty:
+        return all_games
+    
+    # Filter to the specified season
+    all_games = all_games[all_games['season'] == season].copy()
     
     if all_games.empty:
         return all_games
@@ -137,13 +156,16 @@ def recompute_features() -> pd.DataFrame:
         b2b_home.append(bool(home_played_yesterday))
         b2b_away.append(bool(away_played_yesterday))
         
+        # Only use games from THE SAME SEASON for last_10 calculation
         prior_season = prior_games[prior_games['season'] == season]
         
+        # Get last 10 games of this team IN THIS SEASON only
         home_prior = prior_season[
             (prior_season['home_team_id'] == home_team) | (prior_season['away_team_id'] == home_team)
         ].sort_values('game_date_est').tail(10)
         
         if home_prior.empty:
+            # No prior games in this season - first game of season defaults to 0.5
             home_wpct = 0.5
         else:
             home_prior = home_prior.copy()
@@ -431,3 +453,90 @@ def get_prediction_accuracy() -> dict:
     """).fetchone()
     conn.close()
     return {"total_games": result[0], "correct": result[1], "accuracy_pct": result[2]}
+
+
+def seed_seasons_from_games():
+    """Seed seasons table from existing games data."""
+    conn = get_connection()
+    # A full regular season has ~1230 games, use 1200 as threshold
+    MIN_GAMES_FOR_COMPLETE = 1200
+    conn.execute("""
+        INSERT OR REPLACE INTO seasons (season_year, games_loaded, is_regular_season_complete)
+        SELECT 
+            season, 
+            COUNT(*) as games_loaded,
+            CASE WHEN COUNT(*) >= ? THEN TRUE ELSE FALSE END as is_regular_season_complete
+        FROM games 
+        GROUP BY season
+    """, [MIN_GAMES_FOR_COMPLETE])
+    conn.commit()
+    conn.close()
+
+
+def get_incomplete_seasons() -> list:
+    """Get list of incomplete seasons."""
+    conn = get_connection()
+    result = conn.execute("""
+        SELECT season_year FROM seasons 
+        WHERE is_regular_season_complete = FALSE 
+        ORDER BY season_year DESC
+    """).fetchall()
+    conn.close()
+    return [r[0] for r in result]
+
+
+def get_current_season() -> int | None:
+    """Get the current (most recent incomplete) season."""
+    conn = get_connection()
+    result = conn.execute("""
+        SELECT season_year FROM seasons 
+        WHERE is_regular_season_complete = FALSE 
+        ORDER BY season_year DESC 
+        LIMIT 1
+    """).fetchone()
+    conn.close()
+    return result[0] if result else None
+
+
+def has_teams() -> bool:
+    """Check if teams are loaded."""
+    conn = get_connection()
+    count = conn.execute("SELECT COUNT(*) FROM teams").fetchone()[0]
+    conn.close()
+    return count > 0
+
+
+def mark_season_complete(season_year: int):
+    """Mark a season as complete."""
+    conn = get_connection()
+    conn.execute("""
+        UPDATE seasons 
+        SET is_regular_season_complete = TRUE 
+        WHERE season_year = ?
+    """, [season_year])
+    conn.commit()
+    conn.close()
+
+
+def update_season_games_count(season_year: int):
+    """Update the games_loaded count for a season."""
+    conn = get_connection()
+    count = conn.execute("""
+        SELECT COUNT(*) FROM games WHERE season = ?
+    """, [season_year]).fetchone()[0]
+    conn.execute("""
+        UPDATE seasons SET games_loaded = ?, last_extract_at = CURRENT_TIMESTAMP 
+        WHERE season_year = ?
+    """, [count, season_year])
+    conn.commit()
+    conn.close()
+
+
+def get_season_games_count(season_year: int) -> int:
+    """Get the count of games for a season."""
+    conn = get_connection()
+    count = conn.execute("""
+        SELECT COUNT(*) FROM games WHERE season = ?
+    """, [season_year]).fetchone()[0]
+    conn.close()
+    return count

@@ -25,9 +25,73 @@ HEADERS = {
 }
 
 
-def get_connection():
-    conn = duckdb.connect(str(DB_PATH))
-    return conn
+def update_playoffs_start_date(season: int) -> bool:
+    """Fetch playoffs start date from Basketball-Reference and update seasons table.
+    
+    Returns:
+        True if playoffs date found and updated, False otherwise
+    """
+    playoffs_url = f"https://www.basketball-reference.com/playoffs/NBA_{season}_games.html"
+    
+    try:
+        resp = requests.get(playoffs_url, headers=HEADERS, timeout=30)
+        if resp.status_code != 200:
+            print(f"  Playoffs page not found for season {season}")
+            return False
+        
+        soup = BeautifulSoup(resp.text, "html.parser")
+        table = soup.find("table", {"id": "schedule"})
+        if not table:
+            return False
+        
+        tbody = table.find("tbody")
+        if not tbody:
+            return False
+        
+        # Get first playoff game date
+        for row in tbody.find_all("tr"):
+            if row.get("class") and "thead" in row.get("class"):
+                continue
+            
+            date_cell = row.find("th", {"data-stat": "date_game"})
+            if not date_cell:
+                continue
+            
+            date_link = date_cell.find("a")
+            if not date_link:
+                continue
+            
+            date_text = date_link.get_text(strip=True)
+            if not date_text:
+                continue
+            
+            # Parse the date - format is like "Sat, Apr 19, 2025" or "April 19, 2025"
+            from datetime import datetime
+            try:
+                # Try with day of week first
+                try:
+                    playoff_date = datetime.strptime(date_text, "%a, %b %d, %Y").date()
+                except ValueError:
+                    playoff_date = datetime.strptime(date_text, "%B %d, %Y").date()
+            except ValueError:
+                continue
+            
+            # Update seasons table
+            conn = get_connection()
+            conn.execute("""
+                UPDATE seasons SET playoffs_start_date = ? WHERE season_year = ?
+            """, [playoff_date, season])
+            conn.commit()
+            conn.close()
+            
+            print(f"  Season {season} playoffs start: {playoff_date}")
+            return True
+        
+        return False
+        
+    except Exception as e:
+        print(f"  Error fetching playoffs date: {e}")
+        return False
 
 
 def ensure_tables():
@@ -249,19 +313,42 @@ def parse_season(html: str, season: int) -> list:
     return games
 
 
-def load_season(season: int, force: bool = False):
+def load_season(season: int, force: bool = False, incremental: bool = True) -> int:
+    """Load games for a season.
+    
+    Args:
+        season: The season year (e.g., 2025 for 2025-2026)
+        force: If True, delete existing games first
+        incremental: If True (default), only load NEW games not in DB
+    
+    Returns:
+        Number of NEW games loaded
+    """
+    from datetime import date as Date
+    
     print(f"Loading season {season}...")
     
-    conn = get_connection()
+    # First, fetch and update playoffs start date
+    print(f"  Checking playoffs start date...")
+    update_playoffs_start_date(season)
     
-    if not force:
-        existing = conn.execute(f"SELECT COUNT(*) FROM games WHERE season = {season}").fetchone()[0]
-        if existing > 0:
-            print(f"Season {season} already has {existing} games. Use --force to reload.")
-            conn.close()
-            return
-    else:
+    # Get playoffs start date from DB
+    conn = get_connection()
+    playoffs_result = conn.execute("""
+        SELECT playoffs_start_date FROM seasons WHERE season_year = ?
+    """, [season]).fetchone()
+    playoffs_start = playoffs_result[0] if playoffs_result else None
+    
+    if force:
         conn.execute(f"DELETE FROM games WHERE season = {season}")
+        print(f"  Cleared existing {season} games")
+    
+    existing_ids = set()
+    if incremental and not force:
+        existing_ids = set(r[0] for r in conn.execute(
+            "SELECT game_id FROM games WHERE season = ?", [season]
+        ).fetchall())
+        print(f"  Found {len(existing_ids)} existing games in DB")
     
     urls = fetch_all_pages(season)
     
@@ -273,33 +360,66 @@ def load_season(season: int, force: bool = False):
         all_games.extend(parse_season(html, season))
     
     games = all_games
-    print(f"Parsed {len(games)} games from season {season}")
+    print(f"  Parsed {len(games)} games from season {season}")
     
+    new_games_count = 0
     for game in games:
+        # Parse game date
+        try:
+            game_date = Date.fromisoformat(game["date"])
+        except (ValueError, KeyError):
+            continue
+        
+        # Skip playoff games - only store regular season for now
+        if playoffs_start and game_date >= playoffs_start:
+            continue
+            
         home_abbrev = game["home_team"]
         away_abbrev = game["away_team"]
         game_id = f"{home_abbrev}{away_abbrev}{season}{game['date'].replace('-', '')}"
+        
+        # Skip if already in DB (incremental mode)
+        if incremental and game_id in existing_ids:
+            continue
+        
+        # Skip games without scores (parse_season already filters, but double-check)
+        if game["home_pts"] is None or game["away_pts"] is None:
+            continue
+        if game["home_pts"] == 0 and game["away_pts"] == 0:
+            continue
+            
         home_team_wins = game["home_pts"] > game["away_pts"]
         
         conn.execute("""
-            INSERT INTO games (game_id, home_team_id, away_team_id, game_date_est, season, home_team_points, away_team_points, home_team_wins)
+            INSERT OR IGNORE INTO games (game_id, home_team_id, away_team_id, game_date_est, season, home_team_points, away_team_points, home_team_wins)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             game_id, home_abbrev, away_abbrev, game["date"], season,
             game["home_pts"], game["away_pts"],
             home_team_wins
         ])
+        new_games_count += 1
     
     conn.commit()
     count = conn.execute(f"SELECT COUNT(*) FROM games WHERE season = {season}").fetchone()[0]
-    print(f"Season {season}: inserted {len(games)} games (total: {count})")
+    print(f"  Season {season}: inserted {new_games_count} NEW games (total: {count})")
+    
+    # Compute features for the season
+    if new_games_count > 0:
+        print(f"  Computing features for season {season}...")
+        from nba_pickem.dataloader import recompute_features
+        recompute_features(season)
+        print(f"  Features computed!")
+    
     conn.close()
+    
+    return new_games_count
 
 
-def recompute_and_save():
-    print("Recomputing features for all games...")
+def recompute_and_save(season: int):
+    print(f"Recomputing features for season {season}...")
     from nba_pickem.dataloader import recompute_features
-    recompute_features()
+    recompute_features(season)
     print("Features computed!")
 
 
@@ -318,9 +438,12 @@ def main():
     parser.add_argument("--teams", action="store_true", help="Load teams and aliases")
     parser.add_argument("--season", type=int, help="Load specific season (e.g., 2025)")
     parser.add_argument("--all-seasons", action="store_true", help="Load all seasons (2022-2026)")
-    parser.add_argument("--force", action="store_true", help="Force reload")
+    parser.add_argument("--force", action="store_true", help="Force reload (deletes existing)")
+    parser.add_argument("--no-incremental", action="store_true", help="Load all games, not just new ones")
     parser.add_argument("--compute-features", action="store_true", help="Recompute features after loading")
     args = parser.parse_args()
+    
+    incremental = not args.no_incremental
     
     if args.teams:
         load_team_aliases()
@@ -330,9 +453,12 @@ def main():
         if args.compute_features:
             recompute_and_save()
     elif args.season:
-        load_season(args.season, force=args.force)
-        if args.compute_features:
+        new_count = load_season(args.season, force=args.force, incremental=incremental)
+        if new_count > 0 and args.compute_features:
             recompute_and_save()
+        # Update seasons table
+        from nba_pickem.dataloader import update_season_games_count
+        update_season_games_count(args.season)
     else:
         parser.print_help()
 
