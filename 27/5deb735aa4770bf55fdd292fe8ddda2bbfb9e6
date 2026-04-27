@@ -1,0 +1,31 @@
+src/nba_pickem/dataloader.py
+  a4a19c5bd71327ff 70-78,113-118,121-126,159,162,168,455-542
+Makefile
+  a4a19c5bd71327ff 1,15-17
+pyproject.toml
+  a4a19c5bd71327ff 30-31
+src/nba_pickem/scripts/load_bball_ref_data.py
+  a4a19c5bd71327ff 28-94,316-328,331-335,337-340,342,344-351,363,365,367-376,380-390,394,401,405-413,415-416,419-420,422,441-442,446-447,456-457,459-461
+src/nba_pickem/scripts/run_extraction.py
+  a4a19c5bd71327ff 4-9,12-15,18-131,136-140,142-162
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "275deb735aa4770bf55fdd292fe8ddda2bbfb9e6",
+  "prompts": {
+    "a4a19c5bd71327ff": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_233845fe3ffe6MrAj93JHxgbvb",
+        "model": "opencode/minimax-m2.5-free"
+      },
+      "human_author": "Derek Gliwa",
+      "messages": [],
+      "total_additions": 424,
+      "total_deletions": 53,
+      "accepted_lines": 416,
+      "overriden_lines": 0
+    }
+  }
+}
