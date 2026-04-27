@@ -111,93 +111,150 @@ def get_games(start_date: str | None = None, end_date: str | None = None) -> pd.
 
 
 def recompute_features(season: int) -> pd.DataFrame:
-    """Recompute features (b2b, last_10_win_pct) for games in a season.
+    """Recompute features for games in a season.
+    
+    DEPRECATED: Use recompute_all_features() instead for all seasons.
     
     Args:
         season: The season year to recompute features for (e.g., 2025 for 2025-2026)
+    """
+    return recompute_all_features(season=season)
+
+
+def recompute_all_features(season: int | None = None) -> pd.DataFrame:
+    """Recompute ALL features (b2b, win%, off_rtg, def_rtg, rest_days, home/away splits).
+    
+    Computes rolling features using as-of logic (only games BEFORE the current game).
+    
+    Args:
+        season: Specific season to recompute, or None for all seasons
     """
     all_games = get_games()
     
     if all_games.empty:
         return all_games
     
-    # Filter to the specified season
-    all_games = all_games[all_games['season'] == season].copy()
+    if season:
+        all_games = all_games[all_games['season'] == season].copy()
+        if all_games.empty:
+            return all_games
     
-    if all_games.empty:
-        return all_games
-    
+    return _compute_features_internal(all_games)
+
+
+def _compute_features_internal(all_games: pd.DataFrame) -> pd.DataFrame:
+    """Internal function to compute all rolling features."""
     all_games = all_games.sort_values('game_date_est').reset_index(drop=True)
     
-    b2b_home = []
-    b2b_away = []
-    last_10_home = []
-    last_10_away = []
+    n_values = [5, 10]
+    
+    for n in n_values:
+        all_games[f'home_win_pct_{n}'] = 0.5
+        all_games[f'away_win_pct_{n}'] = 0.5
+        all_games[f'off_rtg_{n}'] = 100.0
+        all_games[f'def_rtg_{n}'] = 100.0
+        all_games[f'margin_{n}'] = 0.0
+    
+    all_games['rest_days'] = 0
+    all_games['home_wpct_home'] = 0.5
+    all_games['away_wpct_away'] = 0.5
+    
+    lookup_games = all_games.sort_values('game_date_est')
+    
+    print(f"Computing features for {len(all_games)} games...")
     
     for idx, game in all_games.iterrows():
         game_date = pd.to_datetime(game['game_date_est'])
-        yesterday = game_date - pd.Timedelta(days=1)
-        season = game['season']
+        game_season = game['season']
         home_team = game['home_team_id']
         away_team = game['away_team_id']
         
-        prior_games = all_games[all_games['game_date_est'] < game_date]
+        prior_mask = (lookup_games['game_date_est'] < game_date) & (lookup_games['season'] == game_season)
+        prior_games = lookup_games[prior_mask].copy()
         
-        home_played_yesterday = len(prior_games[
-            (prior_games['game_date_est'] == yesterday) &
-            ((prior_games['home_team_id'] == home_team) | (prior_games['away_team_id'] == home_team))
-        ]) > 0
+        same_season_prior = prior_games[prior_games['season'] == game_season]
         
-        away_played_yesterday = len(prior_games[
-            (prior_games['game_date_est'] == yesterday) &
-            ((prior_games['home_team_id'] == away_team) | (prior_games['away_team_id'] == away_team))
-        ]) > 0
+        yesterday = game_date - pd.Timedelta(days=1)
         
-        b2b_home.append(bool(home_played_yesterday))
-        b2b_away.append(bool(away_played_yesterday))
+        home_last_game = prior_games[
+            (prior_games['home_team_id'] == home_team) | (prior_games['away_team_id'] == home_team)
+        ].sort_values('game_date_est').tail(1)
+        away_last_game = prior_games[
+            (prior_games['home_team_id'] == away_team) | (prior_games['away_team_id'] == away_team)
+        ].sort_values('game_date_est').tail(1)
         
-        # Only use games from THE SAME SEASON for last_10 calculation
-        prior_season = prior_games[prior_games['season'] == season]
+        home_rest = (game_date - pd.to_datetime(home_last_game['game_date_est']).iloc[0]).days if not home_last_game.empty else 7
+        away_rest = (game_date - pd.to_datetime(away_last_game['game_date_est']).iloc[0]).days if not away_last_game.empty else 7
         
-        # Get last 10 games of this team IN THIS SEASON only
-        home_prior = prior_season[
-            (prior_season['home_team_id'] == home_team) | (prior_season['away_team_id'] == home_team)
-        ].sort_values('game_date_est').tail(10)
+        all_games.at[idx, 'rest_days'] = max(home_rest, away_rest)
         
-        if home_prior.empty:
-            # No prior games in this season - first game of season defaults to 0.5
-            home_wpct = 0.5
-        else:
-            home_prior = home_prior.copy()
-            home_prior['is_home'] = home_prior['home_team_id'] == home_team
-            home_prior['won'] = home_prior['is_home'] == home_prior['home_team_wins']
-            home_wpct = home_prior['won'].mean() if len(home_prior) > 0 else 0.5
+        for n in n_values:
+            home_team_prior = same_season_prior[
+                (same_season_prior['home_team_id'] == home_team) | (same_season_prior['away_team_id'] == home_team)
+            ].sort_values('game_date_est').tail(n)
+            
+            away_team_prior = same_season_prior[
+                (same_season_prior['home_team_id'] == away_team) | (same_season_prior['away_team_id'] == away_team)
+            ].sort_values('game_date_est').tail(n)
+            
+            if not home_team_prior.empty:
+                home_team_prior_copy = home_team_prior.copy()
+                home_team_prior_copy['is_home'] = home_team_prior_copy['home_team_id'] == home_team
+                home_team_prior_copy['won'] = home_team_prior_copy['is_home'] == home_team_prior_copy['home_team_wins']
+                all_games.at[idx, f'home_win_pct_{n}'] = home_team_prior_copy['won'].mean() if len(home_team_prior_copy) > 0 else 0.5
+                
+                home_team_prior_copy['pts_for'] = home_team_prior_copy.apply(
+                    lambda r: r['home_team_points'] if r['home_team_id'] == home_team else r['away_team_points'], axis=1
+                )
+                all_games.at[idx, f'off_rtg_{n}'] = home_team_prior_copy['pts_for'].mean() if len(home_team_prior_copy) > 0 else 100.0
+                
+                home_team_prior_copy['pts_against'] = home_team_prior_copy.apply(
+                    lambda r: r['away_team_points'] if r['home_team_id'] == home_team else r['home_team_points'], axis=1
+                )
+                all_games.at[idx, f'def_rtg_{n}'] = home_team_prior_copy['pts_against'].mean() if len(home_team_prior_copy) > 0 else 100.0
+                
+                home_team_prior_copy['margin'] = home_team_prior_copy['pts_for'] - home_team_prior_copy['pts_against']
+                all_games.at[idx, f'margin_{n}'] = home_team_prior_copy['margin'].mean() if len(home_team_prior_copy) > 0 else 0.0
+            
+            if not away_team_prior.empty:
+                away_team_prior_copy = away_team_prior.copy()
+                away_team_prior_copy['is_home'] = away_team_prior_copy['home_team_id'] == away_team
+                away_team_prior_copy['won'] = away_team_prior_copy['is_home'] == away_team_prior_copy['home_team_wins']
+                all_games.at[idx, f'away_win_pct_{n}'] = away_team_prior_copy['won'].mean() if len(away_team_prior_copy) > 0 else 0.5
+                
+                away_team_prior_copy['pts_for'] = away_team_prior_copy.apply(
+                    lambda r: r['home_team_points'] if r['home_team_id'] == away_team else r['away_team_points'], axis=1
+                )
+                all_games.at[idx, f'off_rtg_{n}'] = away_team_prior_copy['pts_for'].mean() if len(away_team_prior_copy) > 0 else 100.0
+                
+                away_team_prior_copy['pts_against'] = away_team_prior_copy.apply(
+                    lambda r: r['away_team_points'] if r['home_team_id'] == away_team else r['home_team_points'], axis=1
+                )
+                all_games.at[idx, f'def_rtg_{n}'] = away_team_prior_copy['pts_against'].mean() if len(away_team_prior_copy) > 0 else 100.0
+                
+                away_team_prior_copy['margin'] = away_team_prior_copy['pts_for'] - away_team_prior_copy['pts_against']
+                all_games.at[idx, f'margin_{n}'] = away_team_prior_copy['margin'].mean() if len(away_team_prior_copy) > 0 else 0.0
         
-        away_prior = prior_season[
-            (prior_season['home_team_id'] == away_team) | (prior_season['away_team_id'] == away_team)
-        ].sort_values('game_date_est').tail(10)
+        home_home_games = same_season_prior[same_season_prior['home_team_id'] == home_team].sort_values('game_date_est').tail(10)
+        away_away_games = same_season_prior[same_season_prior['away_team_id'] == away_team].sort_values('game_date_est').tail(10)
         
-        if away_prior.empty:
-            away_wpct = 0.5
-        else:
-            away_prior = away_prior.copy()
-            away_prior['is_home'] = away_prior['home_team_id'] == away_team
-            away_prior['won'] = away_prior['is_home'] == away_prior['home_team_wins']
-            away_wpct = away_prior['won'].mean() if len(away_prior) > 0 else 0.5
+        if not home_home_games.empty:
+            all_games.at[idx, 'home_wpct_home'] = home_home_games['home_team_wins'].mean()
+        if not away_away_games.empty:
+            all_games.at[idx, 'away_wpct_away'] = away_away_games.apply(
+                lambda r: not r['home_team_wins'], axis=1
+            ).mean()
         
-        last_10_home.append(home_wpct)
-        last_10_away.append(away_wpct)
+        if idx % 500 == 0:
+            print(f"  Processed {idx}/{len(all_games)} games...")
     
-    all_games['home_team_b2b'] = b2b_home
-    all_games['away_team_b2b'] = b2b_away
-    all_games['home_last_10_win_pct'] = last_10_home
-    all_games['away_last_10_win_pct'] = last_10_away
-    
+    # Update existing rows with computed features
     conn = get_connection()
-    conn.execute("DELETE FROM games")
-    conn.execute("ALTER TABLE games RENAME TO games_old")
     
-    conn.execute("""
+    has_table = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='games'").fetchone()
+    if not has_table:
+        # Create table if it doesn't exist
+        conn.execute("""
         CREATE TABLE games (
             game_id VARCHAR PRIMARY KEY,
             home_team_id VARCHAR,
@@ -206,34 +263,52 @@ def recompute_features(season: int) -> pd.DataFrame:
             season INTEGER,
             home_team_points INTEGER,
             away_team_points INTEGER,
-            home_win_pct DECIMAL(5,4),
-            home_home_win_pct DECIMAL(5,4),
-            away_win_pct DECIMAL(5,4),
-            away_away_win_pct DECIMAL(5,4),
-            home_last_10_win_pct DECIMAL(5,4),
-            away_last_10_win_pct DECIMAL(5,4),
+            home_win_pct_5 DECIMAL(5,4),
+            home_win_pct_10 DECIMAL(5,4),
+            away_win_pct_5 DECIMAL(5,4),
+            away_win_pct_10 DECIMAL(5,4),
+            off_rtg_5 DECIMAL(6,2),
+            off_rtg_10 DECIMAL(6,2),
+            def_rtg_5 DECIMAL(6,2),
+            def_rtg_10 DECIMAL(6,2),
+            margin_5 DECIMAL(6,2),
+            margin_10 DECIMAL(6,2),
+            rest_days INTEGER,
+            home_wpct_home DECIMAL(5,4),
+            away_wpct_away DECIMAL(5,4),
             home_team_b2b BOOLEAN,
             away_team_b2b BOOLEAN,
             home_team_wins BOOLEAN
         )
     """)
     
+    # UPDATE existing rows with computed features instead of dropping
     for _, row in all_games.iterrows():
         conn.execute("""
-            INSERT INTO games VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            UPDATE games SET 
+                home_win_pct_5 = ?, home_win_pct_10 = ?,
+                away_win_pct_5 = ?, away_win_pct_10 = ?,
+                off_rtg_5 = ?, off_rtg_10 = ?,
+                def_rtg_5 = ?, def_rtg_10 = ?,
+                margin_5 = ?, margin_10 = ?,
+                rest_days = ?,
+                home_wpct_home = ?, away_wpct_away = ?
+            WHERE game_id = ?
         """, [
-            row['game_id'], row['home_team_id'], row['away_team_id'], row['game_date_est'], row['season'],
-            row['home_team_points'], row['away_team_points'],
-            None, None, None, None,
-            row['home_last_10_win_pct'], row['away_last_10_win_pct'],
-            row['home_team_b2b'], row['away_team_b2b'],
-            row['home_team_wins']
+            row.get('home_win_pct_5', 0.5), row.get('home_win_pct_10', 0.5),
+            row.get('away_win_pct_5', 0.5), row.get('away_win_pct_10', 0.5),
+            row.get('off_rtg_5', 100.0), row.get('off_rtg_10', 100.0),
+            row.get('def_rtg_5', 100.0), row.get('def_rtg_10', 100.0),
+            row.get('margin_5', 0.0), row.get('margin_10', 0.0),
+            int(row.get('rest_days', 3)),
+            row.get('home_wpct_home', 0.5), row.get('away_wpct_away', 0.5),
+            row['game_id']
         ])
     
-    conn.execute("DROP TABLE games_old")
     conn.commit()
     conn.close()
     
+    print(f"Features computed for {len(all_games)} games!")
     return all_games
 
 
