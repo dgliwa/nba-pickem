@@ -4,8 +4,8 @@
 Generates predictions for today's games using the trained model.
 
 Usage:
-    PYTHONPATH=. uv run python scripts/run_prediction.py              # Predict today's games
-    PYTHONPATH=. uv run python scripts/run_prediction.py 2024-01-15   # Predict specific date
+    nba-pickem-predict              # Predict today's games
+    nba-pickem-predict 2024-01-15   # Predict specific date
 """
 import argparse
 import pickle
@@ -15,10 +15,11 @@ import requests
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 
-from dataloader import get_games, save_predictions
+from nba_pickem.config import PROJECT_ROOT
+from nba_pickem.dataloader import get_games, save_predictions
 
 
-MODEL_PATH = "worker/nba_model.pkl"
+MODEL_PATH = PROJECT_ROOT / "worker" / "nba_model.pkl"
 
 
 def load_model():

@@ -4,19 +4,18 @@
 Uses requests to fetch league schedule pages directly.
 
 Usage:
-    PYTHONPATH=. uv run python scripts/load_bball_ref_data.py --teams
-    PYTHONPATH=. uv run python scripts/load_bball_ref_data.py --season 2025
-    PYTHONPATH=. uv run python scripts/load_bball_ref_data.py --all-seasons --compute-features
+    nba-pickem-load-bball-ref --teams
+    nba-pickem-load-bball-ref --season 2025
+    nba-pickem-load-bball-ref --all-seasons --compute-features
 """
 import argparse
-import duckdb
 import requests
 import time
 from pathlib import Path
 from bs4 import BeautifulSoup
 
-
-DB_PATH = Path(__file__).parent.parent / "data" / "nba_pickem.duckdb"
+from nba_pickem.config import DB_PATH
+from nba_pickem.dataloader import get_connection
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -299,7 +298,7 @@ def load_season(season: int, force: bool = False):
 
 def recompute_and_save():
     print("Recomputing features for all games...")
-    from dataloader import recompute_features
+    from nba_pickem.dataloader import recompute_features
     recompute_features()
     print("Features computed!")
 

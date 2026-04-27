@@ -1,8 +1,7 @@
 import duckdb
 import pandas as pd
-from pathlib import Path
 
-DB_PATH = Path(__file__).parent.parent / "data" / "nba_pickem.duckdb"
+from .config import DB_PATH
 
 
 def get_connection():

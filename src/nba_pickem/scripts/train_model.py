@@ -4,18 +4,18 @@
 Trains a RandomForest model on historical NBA games and saves to pickle.
 
 Usage:
-    PYTHONPATH=. uv run python scripts/train_model.py (Recommended)
+    nba-pickem-train
 """
 import argparse
 import pickle
 import pandas as pd
 import numpy as np
-from pathlib import Path
 
-from dataloader import get_games
+from nba_pickem.config import PROJECT_ROOT
+from nba_pickem.dataloader import get_games
 
 
-MODEL_PATH = Path("worker/nba_model.pkl")
+MODEL_PATH = PROJECT_ROOT / "worker" / "nba_model.pkl"
 
 
 def prepare_training_data(games_df: pd.DataFrame, train_seasons: list[int]) -> tuple:

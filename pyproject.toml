@@ -18,3 +18,13 @@ dependencies = [
   "duckdb",
   "basketball-reference-scraper",
 ]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+nba-pickem = "nba_pickem.__main__:main"
+nba-pickem-init = "nba_pickem.scripts.setup:main"
+nba-pickem-train = "nba_pickem.scripts.train_model:main"
+nba-pickem-predict = "nba_pickem.scripts.run_prediction:main"
+nba-pickem-extract = "nba_pickem.scripts.run_extraction:main"

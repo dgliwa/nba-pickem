@@ -1,4 +1,4 @@
-from dataloader import get_moneylines as retrieve_moneylines_df
+from nba_pickem.dataloader import get_moneylines as retrieve_moneylines_df
 from scraping.spiders.base_sports_book_scraper import BaseSportsBookScraper
 
 

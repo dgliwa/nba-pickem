@@ -4,19 +4,19 @@
 Initializes the DuckDB database and optionally loads seed data.
 
 Usage:
-    PYTHONPATH=. uv run python scripts/setup.py           # Initialize empty DB
-    PYTHONPATH=. uv run python scripts/setup.py --load  # Initialize and load seed data from CSV
+    nba-pickem-init           # Initialize empty DB
+    nba-pickem-init --load  # Initialize and load seed data from CSV
 """
 import argparse
-from pathlib import Path
 
-from dataloader import init_db, get_teams, save_teams, get_games, save_games
+from nba_pickem.config import DATA_DIR
+from nba_pickem.dataloader import init_db, get_teams, save_teams, get_games, save_games
 
 
 def load_seed_data():
     print("Loading seed data...")
 
-    teams_csv = Path(__file__).parent.parent / "data" / "raw" / "nba_teams.csv"
+    teams_csv = DATA_DIR / "raw" / "nba_teams.csv"
     if teams_csv.exists():
         import pandas as pd
         teams_df = pd.read_csv(teams_csv)
@@ -24,7 +24,7 @@ def load_seed_data():
             save_teams(teams_df)
             print(f"Loaded {len(teams_df)} teams")
 
-    games_csv = Path(__file__).parent.parent / "data" / "raw" / "nba_games.csv"
+    games_csv = DATA_DIR / "raw" / "nba_games.csv"
     if games_csv.exists():
         import pandas as pd
         games_df = pd.read_csv(games_csv, parse_dates=["GAME_DATE_EST"])

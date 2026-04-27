@@ -1,32 +1,28 @@
-.PHONY: install init extract predict jupyter clean
+.PHONY: install init extract extract-teams extract-games predict jupyter clean
 
 install:
-	uv sync
+	uv pip install -e .
 
 init:
-	uv run python -c "from dataloader import init_db; init_db()"
+	nba-pickem-init
+
+init-load:
+	nba-pickem-init --load
 
 extract:
-	uv run python scripts/run_extraction.py
+	nba-pickem-extract
 
 extract-teams:
-	uv run python scripts/run_extraction.py --teams
+	nba-pickem-extract --teams
 
 extract-games:
-	uv run python scripts/run_extraction.py --games
-
-extract-matchups:
-	uv run python scripts/run_extraction.py --matchups
-
-extract-odds:
-	uv run python scripts/run_extraction.py --odds
+	nba-pickem-extract --games
 
 predict:
-	uv run python scripts/run_prediction.py
+	nba-pickem-predict
 
 predict-date:
-	$(eval DATE = $(shell date +%Y-%m-%d))
-	uv run python scripts/run_prediction.py $(DATE)
+	nba-pickem-predict $(shell date +%Y-%m-%d)
 
 jupyter:
 	uv run jupyter notebook
