@@ -23,7 +23,7 @@ MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 def prepare_training_data(games_df: pd.DataFrame, train_seasons: list[int], for_regressor: bool = False) -> tuple:
     df = games_df[games_df['season'].isin(train_seasons)].copy()
-    df = df.dropna(subset=['home_win_pct_5', 'away_win_pct_5', 'off_rtg_5', 'def_rtg_5'])
+    df = df.dropna(subset=['home_win_pct_5', 'away_win_pct_5', 'home_off_rtg_5', 'home_def_rtg_5'])
     
     df['home_team_enc'] = df['home_team_id'].astype('category').cat.codes
     df['away_team_enc'] = df['away_team_id'].astype('category').cat.codes
@@ -32,9 +32,12 @@ def prepare_training_data(games_df: pd.DataFrame, train_seasons: list[int], for_
         'home_team_enc', 'away_team_enc',
         'home_win_pct_5', 'home_win_pct_10',
         'away_win_pct_5', 'away_win_pct_10',
-        'off_rtg_5', 'off_rtg_10',
-        'def_rtg_5', 'def_rtg_10',
-        'margin_5', 'margin_10',
+        'home_off_rtg_5', 'home_off_rtg_10',
+        'home_def_rtg_5', 'home_def_rtg_10',
+        'home_margin_5', 'home_margin_10',
+        'away_off_rtg_5', 'away_off_rtg_10',
+        'away_def_rtg_5', 'away_def_rtg_10',
+        'away_margin_5', 'away_margin_10',
         'rest_days',
         'home_wpct_home', 'away_wpct_away',
     ]
@@ -168,9 +171,12 @@ def main():
             'home_team_enc', 'away_team_enc',
             'home_win_pct_5', 'home_win_pct_10',
             'away_win_pct_5', 'away_win_pct_10',
-            'off_rtg_5', 'off_rtg_10',
-            'def_rtg_5', 'def_rtg_10',
-            'margin_5', 'margin_10',
+            'home_off_rtg_5', 'home_off_rtg_10',
+            'home_def_rtg_5', 'home_def_rtg_10',
+            'home_margin_5', 'home_margin_10',
+            'away_off_rtg_5', 'away_off_rtg_10',
+            'away_def_rtg_5', 'away_def_rtg_10',
+            'away_margin_5', 'away_margin_10',
             'rest_days',
             'home_wpct_home', 'away_wpct_away',
         ]

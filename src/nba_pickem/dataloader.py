@@ -151,9 +151,12 @@ def _compute_features_internal(all_games: pd.DataFrame) -> pd.DataFrame:
     for n in n_values:
         all_games[f'home_win_pct_{n}'] = 0.5
         all_games[f'away_win_pct_{n}'] = 0.5
-        all_games[f'off_rtg_{n}'] = 100.0
-        all_games[f'def_rtg_{n}'] = 100.0
-        all_games[f'margin_{n}'] = 0.0
+        all_games[f'home_off_rtg_{n}'] = 100.0
+        all_games[f'home_def_rtg_{n}'] = 100.0
+        all_games[f'home_margin_{n}'] = 0.0
+        all_games[f'away_off_rtg_{n}'] = 100.0
+        all_games[f'away_def_rtg_{n}'] = 100.0
+        all_games[f'away_margin_{n}'] = 0.0
     
     all_games['rest_days'] = 0
     all_games['home_wpct_home'] = 0.5
@@ -206,15 +209,15 @@ def _compute_features_internal(all_games: pd.DataFrame) -> pd.DataFrame:
                 home_team_prior_copy['pts_for'] = home_team_prior_copy.apply(
                     lambda r: r['home_team_points'] if r['home_team_id'] == home_team else r['away_team_points'], axis=1
                 )
-                all_games.at[idx, f'off_rtg_{n}'] = home_team_prior_copy['pts_for'].mean() if len(home_team_prior_copy) > 0 else 100.0
+                all_games.at[idx, f'home_off_rtg_{n}'] = home_team_prior_copy['pts_for'].mean() if len(home_team_prior_copy) > 0 else 100.0
                 
                 home_team_prior_copy['pts_against'] = home_team_prior_copy.apply(
                     lambda r: r['away_team_points'] if r['home_team_id'] == home_team else r['home_team_points'], axis=1
                 )
-                all_games.at[idx, f'def_rtg_{n}'] = home_team_prior_copy['pts_against'].mean() if len(home_team_prior_copy) > 0 else 100.0
+                all_games.at[idx, f'home_def_rtg_{n}'] = home_team_prior_copy['pts_against'].mean() if len(home_team_prior_copy) > 0 else 100.0
                 
                 home_team_prior_copy['margin'] = home_team_prior_copy['pts_for'] - home_team_prior_copy['pts_against']
-                all_games.at[idx, f'margin_{n}'] = home_team_prior_copy['margin'].mean() if len(home_team_prior_copy) > 0 else 0.0
+                all_games.at[idx, f'home_margin_{n}'] = home_team_prior_copy['margin'].mean() if len(home_team_prior_copy) > 0 else 0.0
             
             if not away_team_prior.empty:
                 away_team_prior_copy = away_team_prior.copy()
@@ -225,15 +228,15 @@ def _compute_features_internal(all_games: pd.DataFrame) -> pd.DataFrame:
                 away_team_prior_copy['pts_for'] = away_team_prior_copy.apply(
                     lambda r: r['home_team_points'] if r['home_team_id'] == away_team else r['away_team_points'], axis=1
                 )
-                all_games.at[idx, f'off_rtg_{n}'] = away_team_prior_copy['pts_for'].mean() if len(away_team_prior_copy) > 0 else 100.0
+                all_games.at[idx, f'away_off_rtg_{n}'] = away_team_prior_copy['pts_for'].mean() if len(away_team_prior_copy) > 0 else 100.0
                 
                 away_team_prior_copy['pts_against'] = away_team_prior_copy.apply(
                     lambda r: r['away_team_points'] if r['home_team_id'] == away_team else r['home_team_points'], axis=1
                 )
-                all_games.at[idx, f'def_rtg_{n}'] = away_team_prior_copy['pts_against'].mean() if len(away_team_prior_copy) > 0 else 100.0
+                all_games.at[idx, f'away_def_rtg_{n}'] = away_team_prior_copy['pts_against'].mean() if len(away_team_prior_copy) > 0 else 100.0
                 
                 away_team_prior_copy['margin'] = away_team_prior_copy['pts_for'] - away_team_prior_copy['pts_against']
-                all_games.at[idx, f'margin_{n}'] = away_team_prior_copy['margin'].mean() if len(away_team_prior_copy) > 0 else 0.0
+                all_games.at[idx, f'away_margin_{n}'] = away_team_prior_copy['margin'].mean() if len(away_team_prior_copy) > 0 else 0.0
         
         home_home_games = same_season_prior[same_season_prior['home_team_id'] == home_team].sort_values('game_date_est').tail(10)
         away_away_games = same_season_prior[same_season_prior['away_team_id'] == away_team].sort_values('game_date_est').tail(10)
@@ -251,7 +254,7 @@ def _compute_features_internal(all_games: pd.DataFrame) -> pd.DataFrame:
     # Update existing rows with computed features
     conn = get_connection()
     
-    has_table = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='games'").fetchone()
+    has_table = conn.execute("SELECT table_name FROM duckdb_tables() WHERE table_name = 'games'").fetchone()
     if not has_table:
         # Create table if it doesn't exist
         conn.execute("""
@@ -267,12 +270,18 @@ def _compute_features_internal(all_games: pd.DataFrame) -> pd.DataFrame:
             home_win_pct_10 DECIMAL(5,4),
             away_win_pct_5 DECIMAL(5,4),
             away_win_pct_10 DECIMAL(5,4),
-            off_rtg_5 DECIMAL(6,2),
-            off_rtg_10 DECIMAL(6,2),
-            def_rtg_5 DECIMAL(6,2),
-            def_rtg_10 DECIMAL(6,2),
-            margin_5 DECIMAL(6,2),
-            margin_10 DECIMAL(6,2),
+            home_off_rtg_5 DECIMAL(6,2),
+            home_off_rtg_10 DECIMAL(6,2),
+            home_def_rtg_5 DECIMAL(6,2),
+            home_def_rtg_10 DECIMAL(6,2),
+            home_margin_5 DECIMAL(6,2),
+            home_margin_10 DECIMAL(6,2),
+            away_off_rtg_5 DECIMAL(6,2),
+            away_off_rtg_10 DECIMAL(6,2),
+            away_def_rtg_5 DECIMAL(6,2),
+            away_def_rtg_10 DECIMAL(6,2),
+            away_margin_5 DECIMAL(6,2),
+            away_margin_10 DECIMAL(6,2),
             rest_days INTEGER,
             home_wpct_home DECIMAL(5,4),
             away_wpct_away DECIMAL(5,4),
@@ -283,25 +292,37 @@ def _compute_features_internal(all_games: pd.DataFrame) -> pd.DataFrame:
     """)
     
     # UPDATE existing rows with computed features instead of dropping
+    def _val(row, col, default):
+        val = row.get(col, default)
+        if pd.isna(val):
+            return default
+        return val
+    
     for _, row in all_games.iterrows():
         conn.execute("""
             UPDATE games SET 
                 home_win_pct_5 = ?, home_win_pct_10 = ?,
                 away_win_pct_5 = ?, away_win_pct_10 = ?,
-                off_rtg_5 = ?, off_rtg_10 = ?,
-                def_rtg_5 = ?, def_rtg_10 = ?,
-                margin_5 = ?, margin_10 = ?,
+                home_off_rtg_5 = ?, home_off_rtg_10 = ?,
+                home_def_rtg_5 = ?, home_def_rtg_10 = ?,
+                home_margin_5 = ?, home_margin_10 = ?,
+                away_off_rtg_5 = ?, away_off_rtg_10 = ?,
+                away_def_rtg_5 = ?, away_def_rtg_10 = ?,
+                away_margin_5 = ?, away_margin_10 = ?,
                 rest_days = ?,
                 home_wpct_home = ?, away_wpct_away = ?
             WHERE game_id = ?
         """, [
-            row.get('home_win_pct_5', 0.5), row.get('home_win_pct_10', 0.5),
-            row.get('away_win_pct_5', 0.5), row.get('away_win_pct_10', 0.5),
-            row.get('off_rtg_5', 100.0), row.get('off_rtg_10', 100.0),
-            row.get('def_rtg_5', 100.0), row.get('def_rtg_10', 100.0),
-            row.get('margin_5', 0.0), row.get('margin_10', 0.0),
-            int(row.get('rest_days', 3)),
-            row.get('home_wpct_home', 0.5), row.get('away_wpct_away', 0.5),
+            _val(row, 'home_win_pct_5', 0.5), _val(row, 'home_win_pct_10', 0.5),
+            _val(row, 'away_win_pct_5', 0.5), _val(row, 'away_win_pct_10', 0.5),
+            _val(row, 'home_off_rtg_5', 100.0), _val(row, 'home_off_rtg_10', 100.0),
+            _val(row, 'home_def_rtg_5', 100.0), _val(row, 'home_def_rtg_10', 100.0),
+            _val(row, 'home_margin_5', 0.0), _val(row, 'home_margin_10', 0.0),
+            _val(row, 'away_off_rtg_5', 100.0), _val(row, 'away_off_rtg_10', 100.0),
+            _val(row, 'away_def_rtg_5', 100.0), _val(row, 'away_def_rtg_10', 100.0),
+            _val(row, 'away_margin_5', 0.0), _val(row, 'away_margin_10', 0.0),
+            int(_val(row, 'rest_days', 3)),
+            _val(row, 'home_wpct_home', 0.5), _val(row, 'away_wpct_away', 0.5),
             row['game_id']
         ])
     
