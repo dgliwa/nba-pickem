@@ -65,8 +65,14 @@ TELNETCONSOLE_ENABLED = False
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-  "scraping.pipelines.OddsCollectionPipeline": 300,
+  "scraping.pipelines.BasketballRefPipeline": 300,
 }
+
+# Enable logging to see what's happening
+LOG_LEVEL = "DEBUG"
+
+# Twisted reactor - required
+TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html

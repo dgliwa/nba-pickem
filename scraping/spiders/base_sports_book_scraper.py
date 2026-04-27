@@ -1,7 +1,7 @@
 import logging
 import scrapy
 import json
-from dao import retrieve_games_df, retrieve_teams_df
+from dataloader import get_games as retrieve_games_df, get_teams as retrieve_teams_df
 from datetime import datetime
 from zoneinfo import ZoneInfo
 

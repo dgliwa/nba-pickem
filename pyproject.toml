@@ -1,9 +1,9 @@
 [project]
-name = "nba-data-scrapping"
-version = "0.1.0"
-description = "Add your description here"
+name = "nba-pickem"
+version = "0.2.0"
+description = "NBA game prediction system with ML"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11,<3.14"
 dependencies = [
   "pandas",
   "joblib",
@@ -14,11 +14,7 @@ dependencies = [
   "seaborn",
   "scikit-learn",
   "scrapy",
-  "python-fasthtml",
-  "celery",
-  "flower",
-  "redis",
   "crochet",
-  "alembic",
-  "psycopg2-binary"
+  "duckdb",
+  "basketball-reference-scraper",
 ]

@@ -1,47 +1,97 @@
-# NBA games : data collection & model creation
-Initially inspired by this [kaggle project](https://www.kaggle.com/datasets/nathanlauga/nba-games). This repo hosts a few things:
+# NBA Pick'em
 
-* Collection of NBA game data
-* Exploration of said nba game data
-* Model generation to predict winners of nba games
-  * Analysis of model performance with betting odds data to predict performance
-* A web application that displays game winners for the current day (COMING SOON)
+NBA game prediction system using machine learning to predict game winners.
 
-## Getting Started
-Using [uv](https://docs.astral.sh/uv/) to manage dependencies.
+## Architecture
 
 ```
-uv sync
-uv run jupyter server
+┌─────────────────────────────────────────────────────────────┐
+│  EXTRACTION PIPELINE                                      │
+│  Scrapy spiders collect:                                │
+│  - Team data (nba_teams.py)                             │
+│  - Game results (nba_games.py)                          │
+│  - Matchup schedule (nba_season_matchups.py)              │
+│  - Betting odds (sports_book_*.py)                       │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│  STORAGE                                               │
+│  DuckDB (nba_pickem.duckdb)                            │
+│  Tables: teams, games, game_predictions, moneyline_odds   │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│  MODELING PIPELINE                                      │
+│  Jupyter notebooks for:                                │
+│  - Data exploration                                   │
+│  - Feature engineering                                │
+│  - Model training                                     │
+│  - Evaluation                                         │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│  PREDICTION PIPELINE                                    │
+│  Run predictions for any date:                         │
+│  python scripts/run_prediction.py 2025-04-20          │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-This will kick off the jupyter notebook server to run and explore the data notebooks used to generate nba game winner predictions.
+## Quick Start
 
-Advised that you start in `notebooks/00_init.ipynb`
+```bash
+# Install dependencies
+make install
 
-## Data Collection
+# Initialize database
+make init
 
-[scrapy](https://docs.scrapy.org/en/latest/index.html) is used to retrieve the team, game, and betting odds data.
+# Or with seed data from CSV
+python scripts/setup.py --load
 
-Game data is collected from the [nba stats website](https://stats.nba.com/).
+# Extract current data
+make extract
 
-Odds data is collected from [sportsbookreview](https://www.sportsbookreview.com)
+# Generate predictions
+make predict
+```
 
-To collect the data you can run the `00_init.ipynb` notebook, or run scrapy commands for the various scrapers (NOTE: These can take a long time!)
+## Available Commands
 
-ex: `uv run scrapy crawl nba_teams`
+| Command | Description |
+|---------|-------------|
+| `make install` | Install dependencies with uv |
+| `make init` | Initialize empty DuckDB |
+| `make extract` | Run all Scrapy spiders |
+| `make extract-teams` | Run only team spider |
+| `make extract-games` | Run only games spider |
+| `make predict` | Generate predictions for today |
+| `make jupyter` | Start Jupyter server |
+| `make clean` | Remove DB and cache files |
 
-## Analysis
+## Project Structure
 
-Model exploration happens in the `notebook` dir. Things like feature analysis, generation, model creation, profit calculation, etc is in these notebooks.
+```
+nba-pickem/
+├── scraping/           # Scrapy spiders for data collection
+├── scripts/           # CLI entry points
+│   ├── setup.py       # Database initialization
+│   ├── run_extraction.py
+│   └── run_prediction.py
+├── notebooks/        # Model training pipeline
+├── dataloader.py     # DuckDB data layer
+├── services/         # (deprecated - needs removal)
+└── worker/
+    └── nba_model.pkl # Trained model
+```
 
-## Webapp Predictions
+## Requirements
 
-To run the webapp locally, run `uv run uvicorn --reload web.app:main`. It will be available at localhost:8000
+- Python 3.11 - 3.13 (not 3.14 yet due to PyO3 compatibility)
+- [uv](https://docs.astral.sh/uv/) for package management
+- Scrapy for data collection
+- scikit-learn for ML
+- DuckDB for storage
 
-# Contributing
+## License
 
-Check out the issues and milestones
-
-
-
+MIT
