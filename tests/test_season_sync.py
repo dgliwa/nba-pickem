@@ -43,6 +43,16 @@ def test_parser_keeps_unplayed_games_without_scores(monkeypatch):
     assert (unplayed["home_team"], unplayed["away_team"], unplayed["home_pts"]) == ("MIL", "WAS", None)
 
 
+def test_parser_skips_play_in_games(monkeypatch):
+    monkeypatch.setattr(loader, "normalize_team", lambda abbrev: abbrev)
+    html = SCHEDULE_HTML.replace(
+        '<td data-stat="home_pts">120</td></tr>',
+        '<td data-stat="home_pts">120</td><td data-stat="game_remarks">Play-In Game</td></tr>',
+    )
+
+    assert [g["home_team"] for g in loader.parse_season(html, 2027)] == ["MIL"]
+
+
 def test_unplayed_game_is_stored_then_gains_result(conn):
     assert sync_games(conn, 2027, [game("2026-10-21", "MIL", "WAS")]) == 0
     assert outcomes(conn) == [("MILWAS20272026" "1021", None)]

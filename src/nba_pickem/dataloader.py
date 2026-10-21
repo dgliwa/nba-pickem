@@ -559,20 +559,29 @@ def get_prediction_accuracy() -> dict:
 
 
 def seed_seasons_from_games():
-    """Seed seasons table from existing games data."""
+    """Seed seasons table from existing games data, keeping known playoff start dates."""
     conn = get_connection()
-    # A full regular season has ~1230 games, use 1200 as threshold
-    MIN_GAMES_FOR_COMPLETE = 1200
     conn.execute("""
-        INSERT OR REPLACE INTO seasons (season_year, games_loaded, is_regular_season_complete)
-        SELECT 
-            season, 
-            COUNT(home_team_wins) as games_loaded,
-            CASE WHEN COUNT(home_team_wins) >= ? THEN TRUE ELSE FALSE END as is_regular_season_complete
-        FROM games 
-        GROUP BY season
-    """, [MIN_GAMES_FOR_COMPLETE])
-    conn.commit()
+        INSERT INTO seasons (season_year, games_loaded)
+        SELECT season, COUNT(home_team_wins) FROM games GROUP BY season
+        ON CONFLICT (season_year) DO UPDATE SET games_loaded = excluded.games_loaded
+    """)
+    conn.close()
+    update_season_completion()
+
+
+def update_season_completion(season_year: int | None = None):
+    """A regular season is complete once its playoffs have started.
+
+    Uses the playoff start date rather than a game count, so shortened seasons
+    (2012 lockout, 2020 bubble, 2021's 72 games) complete like any other.
+    """
+    conn = get_connection()
+    conn.execute(f"""
+        UPDATE seasons
+        SET is_regular_season_complete = COALESCE(playoffs_start_date <= current_date, FALSE)
+        {'WHERE season_year = ?' if season_year is not None else ''}
+    """, [season_year] if season_year is not None else [])
     conn.close()
 
 
@@ -609,17 +618,6 @@ def has_teams() -> bool:
     return count > 0
 
 
-def mark_season_complete(season_year: int):
-    """Mark a season as complete."""
-    conn = get_connection()
-    conn.execute("""
-        UPDATE seasons 
-        SET is_regular_season_complete = TRUE 
-        WHERE season_year = ?
-    """, [season_year])
-    conn.commit()
-    conn.close()
-
 
 def update_season_games_count(season_year: int):
     """Update the games_loaded count for a season."""
@@ -633,13 +631,3 @@ def update_season_games_count(season_year: int):
     """, [count, season_year])
     conn.commit()
     conn.close()
-
-
-def get_season_games_count(season_year: int) -> int:
-    """Get the count of games for a season."""
-    conn = get_connection()
-    count = conn.execute("""
-        SELECT COUNT(home_team_wins) FROM games WHERE season = ?
-    """, [season_year]).fetchone()[0]
-    conn.close()
-    return count

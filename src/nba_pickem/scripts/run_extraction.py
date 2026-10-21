@@ -6,33 +6,35 @@ Smart extraction that:
 - Loads teams if not loaded
 - Loads NEW games incrementally (skips existing, skips no scores)
 - Recomputes features for new games
-- Marks season complete when 1200+ games loaded AND no new games
+- Marks a season complete once its playoffs have started (works for shortened seasons)
 
 Usage:
     nba-pickem-extract --teams     # Load teams only
     nba-pickem-extract            # Auto-detect latest incomplete season
     nba-pickem-extract --all      # All incomplete seasons
     nba-pickem-extract 2025       # Specific season
+    nba-pickem-extract --since 2015  # Backfill every incomplete season from 2015 to now
 """
 import argparse
 import sys
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+import pandas as pd
 
 from nba_pickem.dataloader import (
+    ensure_season,
     get_connection,
     has_teams,
     get_incomplete_seasons,
     get_current_season,
     update_season_games_count,
-    mark_season_complete,
-    get_season_games_count,
+    update_season_completion,
     seed_seasons_from_games,
-    recompute_features,
 )
+from nba_pickem.features import season_for_date
 
 from nba_pickem.scripts.load_bball_ref_data import load_teams, load_team_aliases, load_season
-
-
-MIN_REGULAR_SEASON_GAMES = 1200
 
 
 def load_teams_if_needed():
@@ -61,34 +63,20 @@ def extract_season(season: int, force: bool = False) -> bool:
         FROM seasons WHERE season_year = ?
     """, [season]).fetchone()
     
+    conn.close()
     if result and result[0]:  # is_complete
         print(f"Season {season} is marked complete - skipping")
         return False
     
-    conn.close()
-    
     # Load teams first if needed
     load_teams_if_needed()
     
-    # Load games incrementally
+    # Load games incrementally (recomputes features when games gain results)
     new_games = load_season(season, force=force)
     print(f"Loaded {new_games} NEW games for season {season}")
     
-    # Update games count in seasons table
     update_season_games_count(season)
-    
-    # Check if we should mark complete
-    total_games = get_season_games_count(season)
-    if total_games >= MIN_REGULAR_SEASON_GAMES and new_games == 0:
-        print(f"Season {season} appears complete ({total_games} games, no new games)")
-        mark_season_complete(season)
-    elif total_games >= MIN_REGULAR_SEASON_GAMES:
-        print(f"Season {season} has {total_games} games but checking for more...")
-    
-    # Recompute features if new games loaded
-    if new_games > 0:
-        print("Recomputing features for new games...")
-        recompute_features()
+    update_season_completion(season)
     
     return new_games > 0
 
@@ -124,6 +112,14 @@ def extract_all():
     return any_loaded
 
 
+def extract_since(first_season: int):
+    """Extract every incomplete season from first_season through the current one."""
+    current = season_for_date(pd.Timestamp(datetime.now(ZoneInfo('US/Eastern')).date()))
+    for season in range(first_season, current + 1):
+        ensure_season(season)
+        extract_season(season)
+
+
 def seed_seasons():
     """Seed seasons table from existing games data."""
     print("Seeding seasons table from games data...")
@@ -137,6 +133,7 @@ def main():
     parser.add_argument("--all", action="store_true", help="Extract all incomplete seasons")
     parser.add_argument("--force", action="store_true", help="Force reload (deletes existing)")
     parser.add_argument("--seed", action="store_true", help="Seed seasons table from games")
+    parser.add_argument("--since", type=int, help="Extract all incomplete seasons from this one to now")
     parser.add_argument("season", nargs="?", type=int, help="Specific season (e.g., 2025)")
     args = parser.parse_args()
     
@@ -152,6 +149,10 @@ def main():
     
     if args.season:
         extract_season(args.season, force=args.force)
+        return
+    
+    if args.since:
+        extract_since(args.since)
         return
     
     if args.all:

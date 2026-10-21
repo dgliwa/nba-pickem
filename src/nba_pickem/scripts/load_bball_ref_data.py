@@ -18,6 +18,9 @@ from nba_pickem.config import DB_PATH
 from nba_pickem.dataloader import get_connection
 from nba_pickem.season_sync import sync_games
 
+FIRST_SEASON = 2015
+LAST_COMPLETE_SEASON = 2026
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -232,7 +235,7 @@ def parse_points(text: str) -> int | None:
 
 
 def parse_season(html: str, season: int) -> list:
-    """Parse a schedule page. Unplayed games are kept with home_pts/away_pts of None."""
+    """Parse a schedule page. Unplayed games are kept with home_pts/away_pts of None; play-in games are skipped."""
     soup = BeautifulSoup(html, "html.parser")
     table = soup.find("table", {"id": "schedule"})
     if not table:
@@ -257,6 +260,11 @@ def parse_season(html: str, season: int) -> list:
             continue
         
         date_text = date_link.get_text(strip=True)
+        
+        # Play-in games are postseason; keep only the regular season
+        remarks_cell = row.find("td", {"data-stat": "game_remarks"})
+        if remarks_cell and "play-in" in remarks_cell.get_text(strip=True).lower():
+            continue
         
         visitor_pts_cell = row.find("td", {"data-stat": "visitor_pts"})
         home_pts_cell = row.find("td", {"data-stat": "home_pts"})
@@ -329,6 +337,7 @@ def load_season(season: int, force: bool = False, months: list[str] | None = Non
     
     print(f"  Checking playoffs start date...")
     update_playoffs_start_date(season)
+    time.sleep(6)  # Rate limit: the schedule index fetch follows immediately
     
     urls = (
         [f"https://www.basketball-reference.com/leagues/NBA_{season}_games-{month}.html" for month in months]
@@ -340,8 +349,7 @@ def load_season(season: int, force: bool = False, months: list[str] | None = Non
         response = requests.get(url, headers=HEADERS, timeout=30)
         response.raise_for_status()
         scraped.extend(parse_season(response.text, season))
-        if index < len(urls) - 1:
-            time.sleep(6)  # Rate limit between requests
+        time.sleep(6)  # Rate limit between requests (and before the next season's fetches)
     print(f"  Parsed {len(scraped)} games from season {season}")
     
     conn = get_connection()
@@ -375,10 +383,10 @@ def load_season(season: int, force: bool = False, months: list[str] | None = Non
     return newly_scored
 
 
-def recompute_and_save(season: int):
-    print(f"Recomputing features for season {season}...")
-    from nba_pickem.dataloader import recompute_features
-    recompute_features(season)
+def recompute_and_save(season: int | None = None):
+    print(f"Recomputing features for {f'season {season}' if season else 'all seasons'}...")
+    from nba_pickem.dataloader import recompute_all_features
+    recompute_all_features(season)
     print("Features computed!")
 
 
@@ -388,7 +396,7 @@ def load_all_seasons():
     conn.commit()
     conn.close()
     
-    for season in [2022, 2023, 2024, 2025, 2026]:
+    for season in range(FIRST_SEASON, LAST_COMPLETE_SEASON + 1):
         load_season(season, force=True)
 
 
@@ -396,7 +404,7 @@ def main():
     parser = argparse.ArgumentParser(description="Load NBA data from Basketball-Reference")
     parser.add_argument("--teams", action="store_true", help="Load teams and aliases")
     parser.add_argument("--season", type=int, help="Load specific season (e.g., 2025)")
-    parser.add_argument("--all-seasons", action="store_true", help="Load all seasons (2022-2026)")
+    parser.add_argument("--all-seasons", action="store_true", help=f"Reload all seasons ({FIRST_SEASON}-{LAST_COMPLETE_SEASON}); deletes existing games")
     parser.add_argument("--force", action="store_true", help="Force reload (deletes existing)")
     parser.add_argument("--compute-features", action="store_true", help="Recompute features after loading")
     args = parser.parse_args()
@@ -411,7 +419,7 @@ def main():
     elif args.season:
         new_count = load_season(args.season, force=args.force)
         if new_count > 0 and args.compute_features:
-            recompute_and_save()
+            recompute_and_save(args.season)
         # Update seasons table
         from nba_pickem.dataloader import update_season_games_count
         update_season_games_count(args.season)
