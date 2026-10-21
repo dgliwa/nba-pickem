@@ -57,7 +57,7 @@ export class NbaPickemService {
         }
     }
     async runPython(command, reportDate, signal) {
-        const python = this.options.pythonPath ?? join(this.options.projectPath, ".venv", "bin", "python");
+        const python = this.options.pythonPath ?? join(this.options.projectPath, "scripts", "openclaw-python");
         const args = ["-m", "nba_pickem.openclaw_cli", command];
         if (reportDate)
             args.push("--date", reportDate);

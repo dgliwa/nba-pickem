@@ -25,7 +25,6 @@ function fixture(failSecondSend = false) {
   };
   const service = new NbaPickemService({
     projectPath: "/repo",
-    pythonPath: "/repo/.venv/bin/python",
     discordTarget: "channel:1562522490465554432",
     publicationRoot: root,
   }, runner);
@@ -41,6 +40,7 @@ describe("NbaPickemService", () => {
     expect(first.status).toBe("delivered");
     expect(second.status).toBe("already_delivered");
     expect(calls).toHaveLength(3);
+    expect(calls[0].command).toBe("/repo/scripts/openclaw-python");
     expect(calls[0].args).toContain("daily");
     expect(calls.slice(1).every(call => call.args.slice(0, 2).join(" ") === "message send")).toBe(true);
   });

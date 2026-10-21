@@ -26,7 +26,7 @@ export default defineToolPlugin({
     description: "Generate daily NBA picks, grade prior picks, calculate weekly and season accuracy, and publish deterministic reports to Discord.",
     configSchema: Type.Object({
         projectPath: Type.Optional(Type.String({ description: "Absolute path to the NBA Pick'em repository." })),
-        pythonPath: Type.Optional(Type.String({ description: "Python executable with the nba-pickem package installed." })),
+        pythonPath: Type.Optional(Type.String({ description: "Package-contained Python launcher; defaults to scripts/openclaw-python." })),
         discordTarget: Type.Optional(Type.String({ pattern: "^channel:[0-9]{10,30}$", description: "Fixed Discord destination for daily pick and performance messages." })),
         openclawCommand: Type.Optional(Type.String({ minLength: 1, maxLength: 500, description: "OpenClaw CLI command used for deterministic Discord delivery." })),
     }, { additionalProperties: false }),

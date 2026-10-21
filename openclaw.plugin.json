@@ -12,7 +12,7 @@
       },
       "pythonPath": {
         "type": "string",
-        "description": "Python executable with the nba-pickem package installed."
+        "description": "Package-contained Python launcher; defaults to scripts/openclaw-python."
       },
       "discordTarget": {
         "type": "string",
