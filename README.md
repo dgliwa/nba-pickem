@@ -63,6 +63,8 @@ make predict
 | `nba-pickem-predict` | Generate predictions for today |
 | `nba-pickem-predict 2025-04-20` | Predict specific date |
 | `nba-pickem-train` | Train prediction model |
+| `nba-pickem-openclaw daily` | Refresh data, generate picks, and emit the automation report as JSON |
+| `nba-pickem-openclaw report` | Read the saved automation report as JSON |
 | `python -m nba_pickem` | Run as module |
 
 Or use `make` targets:
@@ -106,7 +108,28 @@ nba-pickem/
 - DuckDB for storage
 - Scrapy for data collection (optional)
 
+## OpenClaw automation
+
+The repository includes an OpenClaw tool plugin with three deterministic tools:
+
+- `nba_pickem_daily_publish` refreshes the current season, saves today's picks, and idempotently sends two separate Discord messages to `#bets`.
+- `nba_pickem_report` reads today's picks, previous-day results, current-week accuracy, and current-season accuracy without changing data.
+- `nba_pickem_publication_status` reports full or partial Discord delivery for a date.
+
+The daily publisher records each message delivery separately under OpenClaw state, so a retry resumes after a partial failure without duplicating the picks message. Accuracy counts only completed games with saved pregame predictions. The week begins Monday, and all date boundaries use the NBA's US Eastern date.
+
+The JSON bridge can also be run directly:
+
+```bash
+nba-pickem-openclaw report --date 2026-10-21
+nba-pickem-openclaw daily
+```
+
+The configured OpenClaw scheduler runs the publisher every morning. See [`docs/DISCORD_DISPLAY_OPTIONS.md`](docs/DISCORD_DISPLAY_OPTIONS.md) for richer Discord display options.
+
 ## Cron Usage
+
+For installations without OpenClaw:
 
 ```cron
 # Daily prediction at 8am

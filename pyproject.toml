@@ -22,6 +22,11 @@ dependencies = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
 [project.scripts]
 nba-pickem = "nba_pickem.__main__:main"
 nba-pickem-init = "nba_pickem.scripts.setup:main"
@@ -30,3 +35,4 @@ nba-pickem-predict = "nba_pickem.scripts.run_prediction:main"
 nba-pickem-daily = "nba_pickem.scripts.run_daily:main"
 nba-pickem-extract = "nba_pickem.scripts.run_extraction:main"
 nba-pickem-load-bball-ref = "nba_pickem.scripts.load_bball_ref_data:main"
+nba-pickem-openclaw = "nba_pickem.openclaw_cli:main"
