@@ -20,7 +20,7 @@ def execute_daily(report_date: date) -> dict:
     """Refresh the season, persist picks, and return a deterministic report."""
     season = season_for_date(pd.Timestamp(report_date))
     ensure_season(season)
-    load_season(season)
+    load_season(season, months=[report_date.strftime("%B").lower()])
     update_season_games_count(season)
     predict_for_date(report_date)
     return build_daily_report(report_date)

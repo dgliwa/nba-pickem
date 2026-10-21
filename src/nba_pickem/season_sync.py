@@ -11,8 +11,15 @@ def has_result(game: dict) -> bool:
     return home is not None and away is not None and (home, away) != (0, 0)
 
 
-def sync_games(conn, season: int, scraped: list[dict], playoffs_start: date | None = None) -> int:
-    """Insert new games, fill in results for stored unplayed games, drop unplayed games no longer scheduled.
+def sync_games(
+    conn,
+    season: int,
+    scraped: list[dict],
+    playoffs_start: date | None = None,
+    *,
+    prune_missing: bool = True,
+) -> int:
+    """Insert games and results, optionally dropping unplayed games absent from a full-season fetch.
 
     Returns the number of games that gained a result.
     """
@@ -46,7 +53,7 @@ def sync_games(conn, season: int, scraped: list[dict], playoffs_start: date | No
             continue
         newly_scored += scored
 
-    if scheduled_ids:
+    if prune_missing and scheduled_ids:
         stale = [
             game_id for game_id, played in has_result_in_db.items()
             if not played and game_id not in scheduled_ids

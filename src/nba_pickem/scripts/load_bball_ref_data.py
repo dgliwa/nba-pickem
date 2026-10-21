@@ -311,15 +311,16 @@ def parse_season(html: str, season: int) -> list:
     return games
 
 
-def load_season(season: int, force: bool = False) -> int:
+def load_season(season: int, force: bool = False, months: list[str] | None = None) -> int:
     """Sync a season's schedule and results into the games table.
 
     Stores unplayed games (no outcome yet), fills in results as they appear, and drops
-    unplayed games that left the schedule.
+    unplayed games that left the fetched schedule scope.
 
     Args:
         season: The season year (e.g., 2025 for 2025-2026)
         force: If True, delete existing games first
+        months: Optional Basketball-Reference month slugs for a bounded daily refresh
 
     Returns:
         Number of games that gained a result
@@ -329,12 +330,18 @@ def load_season(season: int, force: bool = False) -> int:
     print(f"  Checking playoffs start date...")
     update_playoffs_start_date(season)
     
+    urls = (
+        [f"https://www.basketball-reference.com/leagues/NBA_{season}_games-{month}.html" for month in months]
+        if months else fetch_all_pages(season)
+    )
     scraped = []
-    for url in fetch_all_pages(season):
+    for index, url in enumerate(urls):
         print(f"  Fetching {url}")
-        html = requests.get(url, headers=HEADERS, timeout=30).text
-        time.sleep(6)  # Rate limit between requests
-        scraped.extend(parse_season(html, season))
+        response = requests.get(url, headers=HEADERS, timeout=30)
+        response.raise_for_status()
+        scraped.extend(parse_season(response.text, season))
+        if index < len(urls) - 1:
+            time.sleep(6)  # Rate limit between requests
     print(f"  Parsed {len(scraped)} games from season {season}")
     
     conn = get_connection()
@@ -345,7 +352,13 @@ def load_season(season: int, force: bool = False) -> int:
         conn.execute("DELETE FROM games WHERE season = ?", [season])
         print(f"  Cleared existing {season} games")
     
-    newly_scored = sync_games(conn, season, scraped, playoffs_start[0] if playoffs_start else None)
+    newly_scored = sync_games(
+        conn,
+        season,
+        scraped,
+        playoffs_start[0] if playoffs_start else None,
+        prune_missing=months is None,
+    )
     conn.commit()
     total, played = conn.execute(
         "SELECT COUNT(*), COUNT(home_team_wins) FROM games WHERE season = ?", [season]
