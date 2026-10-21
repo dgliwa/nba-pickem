@@ -70,7 +70,7 @@ export class NbaPickemService {
   }
 
   private async runPython(command: "daily" | "report", reportDate: string | undefined, signal?: AbortSignal): Promise<DailyReport> {
-    const python = this.options.pythonPath ?? join(this.options.projectPath, ".venv", "bin", "python");
+    const python = this.options.pythonPath ?? join(this.options.projectPath, "scripts", "openclaw-python");
     const args = ["-m", "nba_pickem.openclaw_cli", command];
     if (reportDate) args.push("--date", reportDate);
     const result = await this.runCommand(python, args, {
