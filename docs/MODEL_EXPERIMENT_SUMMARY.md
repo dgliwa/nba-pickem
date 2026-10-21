@@ -1,7 +1,7 @@
 # NBA Pick'em Model Summary
 
 Single source of truth for the model: data flow, features, evaluation method, results, roadmap.
-Reproduce with `uv run python scripts/experiment_models.py` (selection) and `nba-pickem-train` (final model).
+Reproduce with `uv run python scripts/experiment_models.py --train-start 2016` (selection) and `nba-pickem-train` (final model).
 
 ## Data flow
 
@@ -10,14 +10,23 @@ basketball-reference schedule pages (played AND upcoming games)
   └─ nba-pickem-daily  (or nba-pickem-load-bball-ref --season N)
        ├─ games table: unplayed games stored with NULL outcome; results filled in as they post;
        │   unplayed games that leave the schedule are dropped (season_sync.py)
-       ├─ features recomputed for newly played games (dataloader.py, played games only)
+       ├─ rolling features recomputed for newly played games (dataloader.py, played games only)
+       ├─ pre-game Elo recomputed for every stored game, played and upcoming (update_elo)
        └─ nba-pickem-predict -> game_predictions for today's unplayed games
 nba-pickem-train -> worker/best_model.pkl (played games only)
 ```
 
 Run `nba-pickem-daily` once a day (after results post); it syncs the current season and predicts today.
 Game ids are deterministic (`{home}{away}{season}{YYYYMMDD}`), so predictions join to outcomes.
-A season counts as complete only by *played* games (`COUNT(home_team_wins)`), since upcoming games are stored too.
+A regular season counts as complete once its playoffs have started, so shortened seasons (2020 bubble, 2021's 72 games) need no special case.
+Stored games are regular season only, 2015 onward: playoff games (on/after the playoff start date) and play-in games
+(bball-ref's "Play-In Game" remark) are skipped. 2024+ seasons include the NBA Cup final, which doesn't count in the standings.
+Backfill with `nba-pickem-extract --since 2015`.
+
+Elo (`compute_elo` in `features.py`) walks all seasons in date order with FiveThirtyEight's NBA parameters: K=20,
+margin-of-victory multiplier `(|margin|+3)^0.8 / (7.5 + 0.006·winner_elo_edge)`, 100-point home advantage (none for the
+2020 bubble restart), every team starting at 1500 in 2015 and keeping 75% of its distance from 1500 between seasons.
+2015 serves as warm-up, so training starts in 2016. Parameters are untuned.
 
 Rolling features use only earlier games in the same season, over a team's last N games at any venue
 (`features.py` reproduces these definitions at prediction time; `tests/test_features.py` checks they agree).
@@ -29,11 +38,29 @@ The previous summary (April 2026) is superseded. It chose configs on a random 20
 (adjacent games leak through rolling features) and picked the winner by its 2026 score, so 2026 was not a clean test.
 
 Now:
-- **Selection:** walk-forward folds only: test 2024 trained on 2022–23, test 2025 trained on 2022–24. 2,474 test games, standard error ≈ ±1.0 pt.
-- **Final check:** 2026 (1,237 games, SE ≈ ±1.35 pts) is looked at once, for the selected config and fixed references. Not used to choose.
+- **Selection:** walk-forward folds only: test 2024 and test 2025, each trained on every season from `--train-start` up to the one before. 2,462 test games, standard error ≈ ±1.0 pt.
+- **Early season:** `acc_early` scores just the first 14 days of each test season, where same-season rolling stats have no history.
+- **Final check:** 2026 (1,231 games, SE ≈ ±1.35 pts) is looked at once, for the selected config and fixed references. Not used to choose.
 - Baseline: always pick home = 54.4% (2024–25), 55.5% (2026).
 
-## Results (walk-forward, mean of 2024 and 2025)
+## Results with Elo (October 2026, walk-forward, mean of 2024 and 2025)
+
+Play-in games removed, so the numbers differ slightly from the table further down.
+
+| Feature set | Model | Train from 2022 | Train from 2016 | First 14 days (2016 start) |
+|-------------|-------|-----------------|-----------------|----------------------------|
+| elo_only (1) | lr | 65.6% | 65.8% | 63.0% |
+| elo_plus_home_away (3) | lr | 65.6% | 65.8% | 61.6% |
+| diffs_plus_home_away_elo (7) | lr | 65.8% | 65.7% | 62.6% |
+| all_features (21, no Elo) | lr | 64.0% | 64.5% | 55.9% |
+| diffs_plus_home_away (6, previous selection) | lr | 63.8% | 63.8% | 54.5% |
+
+- Elo adds ≈2 pts overall and ≈8 pts in the first two weeks (rolling stats fall back to defaults until teams have played).
+- Rolling stats add nothing on top of Elo; adding them is within noise.
+- Training from 2016 instead of 2022 doesn't change accuracy. 2015–2021 still matter as Elo warm-up.
+- 2026 single look (trained on 2016–25): elo_only + lr **68.9%** (baseline 55.5%); the old ratings_only + rf_shallow scored 65.4% on the same games.
+
+## Results without Elo (April 2026, walk-forward, mean of 2024 and 2025)
 
 | Feature set | Model | 2024 | 2025 | Mean |
 |-------------|-------|------|------|------|
@@ -57,17 +84,16 @@ What the ablations do support:
 
 ## Selected model
 
-**`diffs_plus_home_away` + logistic regression** (StandardScaler → LogisticRegression), 6 features:
-`d_margin_5`, `d_margin_10`, `d_win_pct_5`, `d_win_pct_10`, `home_wpct_home`, `away_wpct_away`.
+**`elo_only` + logistic regression** (StandardScaler → LogisticRegression) on one feature, `d_elo = home_elo_pre − away_elo_pre`.
+The fitted intercept carries home advantage.
 
-Rule: simplest config within one SE of the best walk-forward mean. It is 0.17 pt behind the top config with 6 features instead of 21,
-no team encoding, a 1.7 KB model instead of an 8.5 MB forest, and native probabilities (calibration not yet checked).
+Rule: simplest config within one SE of the best walk-forward mean. It ties the best mean with one feature.
 
-2026 single look (trained on 2022–25): **65.9%** (baseline 55.5%). For reference, the old winner scored 66.0% and the walk-forward leader
-(all_features + lr) 65.3% on the same games, i.e. all within noise.
+Previous selection (April 2026): `diffs_plus_home_away` + lr, 6 rolling-stat features (`ROLLING_FEATURES` in `features.py`), 65.9% on 2026.
+It predicted 53.8% home for every opening-night game, because no team had same-season history yet.
 
 Canonical artifact: `worker/best_model.pkl` (dict with `model`, `feature_cols`, `model_type`, `feature_set`, `train_seasons`),
-written by `nba-pickem-train` on 2022–2026. The older `worker/nba_model*.pkl` files are unused.
+written by `nba-pickem-train` on 2016–2026. The older `worker/nba_model*.pkl` files are unused.
 
 ## Fixed in this pass
 
@@ -81,15 +107,14 @@ NBA's own endpoints (stats.nba.com, cdn.nba.com) are blocked by Akamai from this
 
 ## Roadmap
 
-Realistic target: a few points of lift over ~64% walk-forward, not 70% (closing betting lines are themselves in the high 60s).
+Realistic target: a point or two over ~66% walk-forward, not 70%+ (closing betting lines are themselves in the high 60s).
 Better benchmark once odds are loaded: accuracy and log-loss vs. implied closing-line probabilities.
 
 | Idea | Impact | Effort |
 |------|--------|--------|
 | Injury / starting-lineup data (biggest missing signal) | High | Medium–High |
 | Odds as a feature / CLV benchmark (SBR scraper exists, untested) | High | Medium |
-| Elo or opponent-adjusted ratings | Medium | Medium |
-| Backfill 2015–2021 (more training data; check regime change) | Medium | Low |
+| Tune Elo (K, home advantage, carryover) on pre-2024 seasons; check calibration | Low–Medium | Low |
 | Per-possession ratings (pace, eFG%, TOV) from box scores | Medium | High |
 | Additional windows (3/7/20), B2B flag | Low (rest_days showed none) | Low |
 

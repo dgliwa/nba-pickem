@@ -108,7 +108,7 @@ def get_games(start_date: str | None = None, end_date: str | None = None, played
 def get_unplayed_games(game_date: str) -> pd.DataFrame:
     conn = get_connection()
     df = conn.execute("""
-        SELECT game_id, home_team_id, away_team_id, game_date_est
+        SELECT game_id, home_team_id, away_team_id, game_date_est, home_elo_pre, away_elo_pre
         FROM games
         WHERE game_date_est = ? AND home_team_wins IS NULL
         ORDER BY game_id

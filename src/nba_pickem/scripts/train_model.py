@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """NBA Pick'em - Model Training Script
 
-Trains the selected model (logistic regression on matchup differentials) and saves
+Trains the selected model (logistic regression on the pre-game Elo difference) and saves
 it to worker/best_model.pkl. Reports a hold-out score on the latest training season
 using a model fit only on earlier seasons, then refits on all seasons.
 
 Usage:
-    nba-pickem-train                          # Train on 2022-2026
+    nba-pickem-train                          # Train on 2016-2026 (2015 is Elo warm-up)
     nba-pickem-train --seasons 2022,2023,2024 # Train on specific seasons
 """
 import argparse
@@ -23,7 +23,7 @@ from nba_pickem.features import MODEL_FEATURES, add_matchup_diffs
 
 MODEL_DIR = PROJECT_ROOT / "worker"
 MODEL_PATH = MODEL_DIR / "best_model.pkl"
-FEATURE_SET = "diffs_plus_home_away"
+FEATURE_SET = "elo_only"
 MODEL_TYPE = "lr"
 
 
@@ -38,7 +38,7 @@ def season_data(games, seasons: list[int]):
 
 def main():
     parser = argparse.ArgumentParser(description="Train NBA prediction model")
-    parser.add_argument("--seasons", type=str, default="2022,2023,2024,2025,2026",
+    parser.add_argument("--seasons", type=str, default=",".join(str(s) for s in range(2016, 2027)),
                         help="Comma-separated list of seasons to train on")
     args = parser.parse_args()
 

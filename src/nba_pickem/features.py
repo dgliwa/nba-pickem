@@ -18,7 +18,10 @@ ELO_HOME_ADVANTAGE = 100
 ELO_SEASON_CARRYOVER = 0.75  # keep 75% of a team's distance from the mean between seasons
 BUBBLE = (date(2020, 7, 30), date(2020, 8, 14))  # neutral-site restart games: no home advantage
 
-MODEL_FEATURES = [
+MODEL_FEATURES = ['d_elo']
+
+# Previous model's inputs; rolling stats add nothing on top of Elo (see docs/MODEL_EXPERIMENT_SUMMARY.md)
+ROLLING_FEATURES = [
     'd_margin_5', 'd_margin_10',
     'd_win_pct_5', 'd_win_pct_10',
     'home_wpct_home', 'away_wpct_away',
