@@ -1,4 +1,7 @@
 #!/bin/sh
 set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-exec "$SCRIPT_DIR/../.venv/bin/python" "$@"
+PROJECT_ROOT=$(dirname -- "$SCRIPT_DIR")
+PYTHON=${NBA_PICKEM_PYTHON:-"$HOME/.openclaw/runtimes/nba-pickem/bin/python"}
+export PYTHONPATH="$PROJECT_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+exec "$PYTHON" "$@"
