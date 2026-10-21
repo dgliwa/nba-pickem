@@ -110,7 +110,14 @@ nba-pickem/
 
 ## OpenClaw automation
 
-The repository includes an OpenClaw tool plugin with three deterministic tools:
+The repository includes an OpenClaw tool plugin with three deterministic tools. Its Python environment lives outside the plugin package because OpenClaw rejects package trees containing virtualenv interpreter symlinks that resolve outside the package:
+
+```bash
+UV_PROJECT_ENVIRONMENT="$HOME/.openclaw/runtimes/nba-pickem" uv sync --dev
+```
+
+Set `NBA_PICKEM_PYTHON` to override that runtime path.
+
 
 - `nba_pickem_daily_publish` refreshes the current season, saves today's picks, and idempotently sends two separate Discord messages to `#bets`.
 - `nba_pickem_report` reads today's picks, previous-day results, current-week accuracy, and current-season accuracy without changing data.
