@@ -71,7 +71,7 @@ written by `nba-pickem-train` on 2022–2026. The older `worker/nba_model*.pkl` 
 - `best_model.pkl` held a 15-feature model while prediction supplied 14; scoreboard numeric team ids don't match the DB's abbreviations.
 - `game_predictions` had INTEGER team ids and stale columns; it is now `(game_id, home_team_id, away_team_id, game_date_est, predicted_home_team_wins, home_win_probability)`.
 
-Not verified live: `team_abbreviations()` assumes the scoreboard's `LineScore` result set (stats.nba.com timed out during development).
+The schedule now comes from ESPN's public scoreboard (`schedule.py`, tested against a saved real response in `tests/fixtures/`); stats.nba.com and cdn.nba.com were unreachable (Akamai blocking).
 
 ## Roadmap
 

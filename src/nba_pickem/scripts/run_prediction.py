@@ -13,15 +13,14 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import pandas as pd
-import requests
 
 from nba_pickem.config import PROJECT_ROOT
 from nba_pickem.dataloader import get_games, save_predictions
+from nba_pickem.schedule import fetch_scoreboard, parse_scoreboard
 from nba_pickem.features import add_matchup_diffs, matchup_features, season_for_date
 
 
 MODEL_PATH = PROJECT_ROOT / "worker" / "best_model.pkl"
-REQUEST_TIMEOUT_SECONDS = 20
 
 
 def load_model():
@@ -29,51 +28,14 @@ def load_model():
         return pickle.load(f)
 
 
-def fetch_todays_games(prediction_date: date):
-    HEADERS = {
-        "Referer": "stats.nba.com",
-        "Content-Type": "application/json",
-        "Accept": "*/*",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Host": "stats.nba.com",
-        "Origin": "https://stats.nba.com",
-        "User-Agent": "Mozilla/5.0 (X11; X86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    }
-    formatted_date = prediction_date.strftime('%m/%d/%Y')
-    url = f"https://stats.nba.com/stats/scoreboardV2?DayOffset=0&LeagueID=00&gameDate={formatted_date}"
-    return requests.get(url, headers=HEADERS, timeout=REQUEST_TIMEOUT_SECONDS).json()
-
-
-def team_abbreviations(games_response) -> dict:
-    # TODO: unverified against a live response (stats.nba.com timed out when this was written)
-    line_scores = next(rs for rs in games_response['resultSets'] if rs['name'] == 'LineScore')
-    id_col = line_scores['headers'].index('TEAM_ID')
-    abbr_col = line_scores['headers'].index('TEAM_ABBREVIATION')
-    return {row[id_col]: row[abbr_col] for row in line_scores['rowSet']}
-
-
-def extract_game_features(games_response, previous_games: pd.DataFrame, prediction_date: date) -> pd.DataFrame:
+def attach_features(schedule: pd.DataFrame, previous_games: pd.DataFrame, prediction_date: date) -> pd.DataFrame:
     game_date = pd.Timestamp(prediction_date)
     prior = previous_games[
         (previous_games['game_date_est'] < game_date)
         & (previous_games['season'] == season_for_date(game_date))
     ]
-    abbreviations = team_abbreviations(games_response)
-    game_headers = next(rs for rs in games_response['resultSets'] if rs['name'] == 'GameHeader')
-
-    games = []
-    for game in game_headers['rowSet']:
-        home_team, away_team = abbreviations[game[6]], abbreviations[game[7]]
-        games.append({
-            "game_id": game[2],
-            "home_team_id": home_team,
-            "away_team_id": away_team,
-            "game_date_est": prediction_date,
-            **matchup_features(prior, home_team, away_team),
-        })
-
-    return add_matchup_diffs(pd.DataFrame(games))
+    features = [matchup_features(prior, g.home_team_id, g.away_team_id) for g in schedule.itertuples()]
+    return add_matchup_diffs(pd.concat([schedule.reset_index(drop=True), pd.DataFrame(features)], axis=1))
 
 
 def predict_games(games_df: pd.DataFrame, model_data: dict) -> pd.DataFrame:
@@ -96,8 +58,8 @@ def main():
     model_data = load_model()
     previous_games = get_games(end_date=prediction_date.strftime('%Y-%m-%d'))
 
-    games_response = fetch_todays_games(prediction_date)
-    games_df = extract_game_features(games_response, previous_games, prediction_date)
+    schedule = parse_scoreboard(fetch_scoreboard(prediction_date), prediction_date)
+    games_df = attach_features(schedule, previous_games, prediction_date)
 
     if games_df.empty:
         print("No games found for this date.")
