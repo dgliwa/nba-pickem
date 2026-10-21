@@ -1,107 +1,90 @@
-# NBA Pick'em Model Experimentation Summary
+# NBA Pick'em Model Summary
 
-## Experiment Overview
+Single source of truth for the model: data flow, features, evaluation method, results, roadmap.
+Reproduce with `uv run python scripts/experiment_models.py` (selection) and `nba-pickem-train` (final model).
 
-Tested multiple feature sets and model types to find the best combination for predicting NBA game outcomes.
+## Data flow
 
-### Feature Sets Tested
-| Feature Set | Description | # Features |
-|-------------|-------------|------------|
-| `all_features` | All available features (win%, ratings, margins, rest, home/away splits) | 21 |
-| `home_only` | Only home team's features | 12 |
-| `away_only` | Only away team's features | 11 |
-| `differentials` | Home and away team features as separate columns | 11 |
-| `ratings_only` | Offensive/defensive ratings and margins only | 14 |
-| `winpct_only` | Win percentage features only | 8 |
-| `top_10` | Top 10 most important features (5-game window) | 10 |
+```
+basketball-reference schedule pages
+  └─ nba-pickem-load-bball-ref --season {year}   -> games table (DuckDB, team ids are abbreviations)
+       └─ recompute_all_features()               -> as-of rolling features per game (dataloader.py)
+            └─ nba-pickem-train                  -> worker/best_model.pkl
+                 └─ nba-pickem-predict [date]    -> game_predictions table
+```
 
-### Models Tested
-- `rf_shallow`: Random Forest (max_depth=5, n_estimators=100)
-- `rf_medium`: Random Forest (max_depth=7, n_estimators=150)
-- `rf_deep`: Random Forest (max_depth=10, n_estimators=200)
-- `gb`: Gradient Boosting (n_estimators=100, max_depth=4)
-- `lr`: Logistic Regression (with StandardScaler)
+Rolling features use only earlier games in the same season, over a team's last N games at any venue
+(`features.py` reproduces these definitions at prediction time; `tests/test_features.py` checks they agree).
+bball-ref rate-limits to ~10 requests/minute.
 
----
+## Evaluation method
 
-## Results
+The previous summary (April 2026) is superseded. It chose configs on a random 20% split of 2022–2025
+(adjacent games leak through rolling features) and picked the winner by its 2026 score, so 2026 was not a clean test.
 
-### Top 5 Configurations by Validation Accuracy (2022-2025 holdout)
-| Feature Set | Model | Train Acc | Val Acc | # Features |
-|-------------|-------|-----------|---------|------------|
-| ratings_only | lr | 61.9% | 64.4% | 14 |
-| ratings_only | rf_deep | 89.5% | 64.2% | 14 |
-| ratings_only | rf_shallow | 66.5% | 64.0% | 14 |
-| all_features | rf_medium | 74.7% | 64.0% | 21 |
-| differentials | rf_medium | 72.7% | 63.9% | 11 |
+Now:
+- **Selection:** walk-forward folds only: test 2024 trained on 2022–23, test 2025 trained on 2022–24. 2,474 test games, standard error ≈ ±1.0 pt.
+- **Final check:** 2026 (1,237 games, SE ≈ ±1.35 pts) is looked at once, for the selected config and fixed references. Not used to choose.
+- Baseline: always pick home = 54.4% (2024–25), 55.5% (2026).
 
-### 2026 Hold-out Test Results (Full Season: 1237 games)
-| Feature Set | Model | Val Acc | 2026 Acc |
-|-------------|-------|---------|----------|
-| ratings_only | lr | 64.4% | 65.2% |
-| ratings_only | rf_shallow | 64.0% | **65.5%** |
-| ratings_only | rf_deep | 64.2% | 64.2% |
-| all_features | rf_medium | 64.0% | 64.8% |
-| differentials | rf_medium | 63.9% | 62.3% |
+## Results (walk-forward, mean of 2024 and 2025)
 
----
+| Feature set | Model | 2024 | 2025 | Mean |
+|-------------|-------|------|------|------|
+| all_features (21) | lr | 64.6% | 63.3% | 63.95% |
+| diffs_plus_home_away (6) | rf_shallow | 63.9% | 63.9% | 63.86% |
+| diffs_plus_home_away (6) | lr | 64.2% | 63.4% | 63.78% |
+| ratings_no_margin (10) | lr | 64.4% | 63.2% | 63.78% |
+| ratings_only (14) | lr | 64.3% | 63.2% | 63.74% |
+| ratings_only (14) | rf_shallow *(old "winner")* | 63.5% | 61.9% | 62.69% |
+| any set | gb | | | 58.6–62.0% |
 
-## Best Model Configuration
+**Takeaway: the top ~25 configurations are statistically indistinguishable** (spread ≈ 1.5 pts vs SE ≈ 1 pt).
+Honest ceiling for rolling team stats is ≈ 64% walk-forward over a 54–55% baseline.
 
-**Winner: `ratings_only` + `rf_shallow` (Random Forest shallow)**
+What the ablations do support:
+- Gradient boosting is consistently worst (overfits). Deeper RFs don't help.
+- `margin_*` features are exactly `off_rtg − def_rtg` (max diff 0.01, rounding). Dropping them leaves LR unchanged (63.78% vs 63.74%).
+- Team-id encodings add nothing for LR (and an ordinal code is meaningless there) and aren't needed.
+- `rest_days` does not help. Win-pct-only is slightly worse than ratings/margins.
+- "Ratings beat win%" from the old summary is not clearly supported; margin and win% differentials together do as well as anything.
 
-- **2026 Accuracy: 65.48%** (810/1237 correct)
-- **Features (14 total):**
-  - Team encodings: `home_team_enc`, `away_team_enc`
-  - Offensive rating: `home_off_rtg_5`, `home_off_rtg_10`, `away_off_rtg_5`, `away_off_rtg_10`
-  - Defensive rating: `home_def_rtg_5`, `home_def_rtg_10`, `away_def_rtg_5`, `away_def_rtg_10`
-  - Margin: `home_margin_5`, `home_margin_10`, `away_margin_5`, `away_margin_10`
+## Selected model
 
----
+**`diffs_plus_home_away` + logistic regression** (StandardScaler → LogisticRegression), 6 features:
+`d_margin_5`, `d_margin_10`, `d_win_pct_5`, `d_win_pct_10`, `home_wpct_home`, `away_wpct_away`.
 
-## Hypothesis: Why This Works
+Rule: simplest config within one SE of the best walk-forward mean. It is 0.17 pt behind the top config with 6 features instead of 21,
+no team encoding, a 1.7 KB model instead of an 8.5 MB forest, and native probabilities (calibration not yet checked).
 
-### 1. Ratings capture more signal than win percentages
-Win percentages are derived from game outcomes, but offensive/defensive ratings capture **how well teams play** independent of wins/losses. A team can win close games (lucky) or lose close games (unlucky), but their point differentials tell a more complete story.
+2026 single look (trained on 2022–25): **65.9%** (baseline 55.5%). For reference, the old winner scored 66.0% and the walk-forward leader
+(all_features + lr) 65.3% on the same games, i.e. all within noise.
 
-### 2. Simpler model generalizes better
-The shallow RF (max_depth=5) outperformed deeper trees and gradient boosting. This suggests:
-- The relationship between ratings and game outcomes is relatively simple
-- Deeper trees were overfitting to training data noise
-- Regularization from shallower trees improves generalization to new seasons
+Canonical artifact: `worker/best_model.pkl` (dict with `model`, `feature_cols`, `model_type`, `feature_set`, `train_seasons`),
+written by `nba-pickem-train` on 2022–2026. The older `worker/nba_model*.pkl` files are unused.
 
-### 3. Ratings-only removes redundant/noisy features
-The `all_features` set (21 features) performed **worse** than `ratings_only` (14 features). Likely reasons:
-- `home_wpct_home` and `away_wpct_away` introduce small-sample noise early in seasons
-- Win percentage features are highly correlated with ratings (redundancy)
-- Rest days has minimal predictive power in NBA (teams manage load well) - **confirmed: adding `rest_days` hurts performance slightly** (65.48% → 65.16%)
+## Fixed in this pass
 
-### 4. Why not Logistic Regression despite similar accuracy?
-Logistic Regression had 65.2% vs RF shallow's 65.5% - essentially tied. However:
-- RF provides feature importance for interpretation
-- RF handles feature interactions automatically
-- RF is more robust to feature scaling
+`nba-pickem-predict` was broken and could not have reproduced these numbers:
+- Home and away features were merged from dicts with identical keys, so the away team's values overwrote the home team's.
+- Prediction used last-N *home-only* games; training used last-N games at any venue.
+- `best_model.pkl` held a 15-feature model while prediction supplied 14; scoreboard numeric team ids don't match the DB's abbreviations.
+- `game_predictions` had INTEGER team ids and stale columns; it is now `(game_id, home_team_id, away_team_id, game_date_est, predicted_home_team_wins, home_win_probability)`.
 
----
+Not verified live: `team_abbreviations()` assumes the scoreboard's `LineScore` result set (stats.nba.com timed out during development).
 
-## Additional Observations
+## Roadmap
 
-### Home Court Advantage
-- Actual home win rate in 2026: **55.5%**
-- Model predicts home win: **66.5%** of time
-- This slight home bias likely helps given the true home court advantage
+Realistic target: a few points of lift over ~64% walk-forward, not 70% (closing betting lines are themselves in the high 60s).
+Better benchmark once odds are loaded: accuracy and log-loss vs. implied closing-line probabilities.
 
-### Training Data
-- Seasons used: 2022, 2023, 2024, 2025
-- Training samples: 4,946 games
+| Idea | Impact | Effort |
+|------|--------|--------|
+| Injury / starting-lineup data (biggest missing signal) | High | Medium–High |
+| Odds as a feature / CLV benchmark (SBR scraper exists, untested) | High | Medium |
+| Elo or opponent-adjusted ratings | Medium | Medium |
+| Backfill 2015–2021 (more training data; check regime change) | Medium | Low |
+| Per-possession ratings (pace, eFG%, TOV) from box scores | Medium | High |
+| Additional windows (3/7/20), B2B flag | Low (rest_days showed none) | Low |
 
----
-
-## Next Steps for Improvement
-
-1. **Add more rolling windows** - Test 3-game, 7-game, 20-game rolling features
-2. **Elo ratings** - Implement Elo system for teams
-3. **Injury data** - Factor in key player injuries (major missing signal)
-4. **B2B analysis** - Back-to-back games may matter more than current features capture
-5. **Home/away specific ratings** - Separate home/off_rtg vs away/off_rtg (already partially done)
-6. **Try XGBoost** - May find better hyperparams than GradientBoosting
+Open questions: manual vs. scraped injuries; accuracy-first or CLV-first.
