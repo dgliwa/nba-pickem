@@ -71,7 +71,7 @@ def extract_season(season: int, force: bool = False) -> bool:
     load_teams_if_needed()
     
     # Load games incrementally
-    new_games = load_season(season, force=force, incremental=True)
+    new_games = load_season(season, force=force)
     print(f"Loaded {new_games} NEW games for season {season}")
     
     # Update games count in seasons table

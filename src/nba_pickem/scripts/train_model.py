@@ -43,7 +43,7 @@ def main():
     args = parser.parse_args()
 
     seasons = sorted(int(s) for s in args.seasons.split(','))
-    games = add_matchup_diffs(get_games())
+    games = add_matchup_diffs(get_games(played_only=True))
 
     X_prior, y_prior = season_data(games, seasons[:-1])
     X_last, y_last = season_data(games, seasons[-1:])

@@ -1,4 +1,4 @@
-.PHONY: install init extract extract-all extract-teams predict predict-date jupyter clean
+.PHONY: daily install init extract extract-all extract-teams predict predict-date jupyter clean
 
 install:
 	uv pip install -e .
@@ -31,3 +31,5 @@ clean:
 	rm -f data/nba_pickem.duckdb
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
+daily:
+	nba-pickem-daily

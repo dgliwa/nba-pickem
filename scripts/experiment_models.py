@@ -96,7 +96,7 @@ def report_final(games: pd.DataFrame, selected: tuple[str, str]) -> None:
 
 
 def main():
-    games = add_matchup_diffs(get_games())
+    games = add_matchup_diffs(get_games(played_only=True))
     results = run_selection(games)
 
     print("=== WALK-FORWARD SELECTION (folds: 2024<-2022-23, 2025<-2022-24) ===")

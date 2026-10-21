@@ -10,7 +10,7 @@ pytestmark = pytest.mark.skipif(not DB_PATH.exists(), reason="requires local Duc
 
 
 def test_prediction_features_match_stored_training_features():
-    games = get_games()
+    games = get_games(played_only=True)
     sample = add_matchup_diffs(games[games['season'] == 2026]).sample(60, random_state=0)
 
     for _, game in sample.iterrows():

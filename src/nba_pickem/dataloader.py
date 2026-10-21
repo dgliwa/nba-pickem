@@ -86,10 +86,12 @@ def save_teams(teams_df: pd.DataFrame):
     conn.close()
 
 
-def get_games(start_date: str | None = None, end_date: str | None = None) -> pd.DataFrame:
+def get_games(start_date: str | None = None, end_date: str | None = None, played_only: bool = False) -> pd.DataFrame:
     conn = get_connection()
     query = "SELECT * FROM games"
     conditions = []
+    if played_only:
+        conditions.append("home_team_wins IS NOT NULL")
     if start_date:
         conditions.append(f"game_date_est >= '{start_date}'")
     if end_date:
@@ -101,6 +103,24 @@ def get_games(start_date: str | None = None, end_date: str | None = None) -> pd.
     if not df.empty and 'game_date_est' in df.columns:
         df['game_date_est'] = pd.to_datetime(df['game_date_est'])
     return df
+
+
+def get_unplayed_games(game_date: str) -> pd.DataFrame:
+    conn = get_connection()
+    df = conn.execute("""
+        SELECT game_id, home_team_id, away_team_id, game_date_est
+        FROM games
+        WHERE game_date_est = ? AND home_team_wins IS NULL
+        ORDER BY game_id
+    """, [game_date]).df()
+    conn.close()
+    return df
+
+
+def ensure_season(season: int):
+    conn = get_connection()
+    conn.execute("INSERT OR IGNORE INTO seasons (season_year) VALUES (?)", [season])
+    conn.close()
 
 
 def recompute_features(season: int) -> pd.DataFrame:
@@ -122,7 +142,7 @@ def recompute_all_features(season: int | None = None) -> pd.DataFrame:
     Args:
         season: Specific season to recompute, or None for all seasons
     """
-    all_games = get_games()
+    all_games = get_games(played_only=True)
     
     if all_games.empty:
         return all_games
@@ -547,8 +567,8 @@ def seed_seasons_from_games():
         INSERT OR REPLACE INTO seasons (season_year, games_loaded, is_regular_season_complete)
         SELECT 
             season, 
-            COUNT(*) as games_loaded,
-            CASE WHEN COUNT(*) >= ? THEN TRUE ELSE FALSE END as is_regular_season_complete
+            COUNT(home_team_wins) as games_loaded,
+            CASE WHEN COUNT(home_team_wins) >= ? THEN TRUE ELSE FALSE END as is_regular_season_complete
         FROM games 
         GROUP BY season
     """, [MIN_GAMES_FOR_COMPLETE])
@@ -605,7 +625,7 @@ def update_season_games_count(season_year: int):
     """Update the games_loaded count for a season."""
     conn = get_connection()
     count = conn.execute("""
-        SELECT COUNT(*) FROM games WHERE season = ?
+        SELECT COUNT(home_team_wins) FROM games WHERE season = ?
     """, [season_year]).fetchone()[0]
     conn.execute("""
         UPDATE seasons SET games_loaded = ?, last_extract_at = CURRENT_TIMESTAMP 
@@ -619,7 +639,7 @@ def get_season_games_count(season_year: int) -> int:
     """Get the count of games for a season."""
     conn = get_connection()
     count = conn.execute("""
-        SELECT COUNT(*) FROM games WHERE season = ?
+        SELECT COUNT(home_team_wins) FROM games WHERE season = ?
     """, [season_year]).fetchone()[0]
     conn.close()
     return count

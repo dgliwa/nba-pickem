@@ -6,12 +6,18 @@ Reproduce with `uv run python scripts/experiment_models.py` (selection) and `nba
 ## Data flow
 
 ```
-basketball-reference schedule pages
-  └─ nba-pickem-load-bball-ref --season {year}   -> games table (DuckDB, team ids are abbreviations)
-       └─ recompute_all_features()               -> as-of rolling features per game (dataloader.py)
-            └─ nba-pickem-train                  -> worker/best_model.pkl
-                 └─ nba-pickem-predict [date]    -> game_predictions table
+basketball-reference schedule pages (played AND upcoming games)
+  └─ nba-pickem-daily  (or nba-pickem-load-bball-ref --season N)
+       ├─ games table: unplayed games stored with NULL outcome; results filled in as they post;
+       │   unplayed games that leave the schedule are dropped (season_sync.py)
+       ├─ features recomputed for newly played games (dataloader.py, played games only)
+       └─ nba-pickem-predict -> game_predictions for today's unplayed games
+nba-pickem-train -> worker/best_model.pkl (played games only)
 ```
+
+Run `nba-pickem-daily` once a day (after results post); it syncs the current season and predicts today.
+Game ids are deterministic (`{home}{away}{season}{YYYYMMDD}`), so predictions join to outcomes.
+A season counts as complete only by *played* games (`COUNT(home_team_wins)`), since upcoming games are stored too.
 
 Rolling features use only earlier games in the same season, over a team's last N games at any venue
 (`features.py` reproduces these definitions at prediction time; `tests/test_features.py` checks they agree).
@@ -71,7 +77,7 @@ written by `nba-pickem-train` on 2022–2026. The older `worker/nba_model*.pkl` 
 - `best_model.pkl` held a 15-feature model while prediction supplied 14; scoreboard numeric team ids don't match the DB's abbreviations.
 - `game_predictions` had INTEGER team ids and stale columns; it is now `(game_id, home_team_id, away_team_id, game_date_est, predicted_home_team_wins, home_win_probability)`.
 
-The schedule now comes from ESPN's public scoreboard (`schedule.py`, tested against a saved real response in `tests/fixtures/`); stats.nba.com and cdn.nba.com were unreachable (Akamai blocking).
+NBA's own endpoints (stats.nba.com, cdn.nba.com) are blocked by Akamai from this network, so the schedule comes from bball-ref like everything else.
 
 ## Roadmap
 

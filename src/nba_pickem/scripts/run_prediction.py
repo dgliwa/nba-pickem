@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """NBA Pick'em - Prediction Script
 
-Generates predictions for a day's games using the trained model.
+Predicts a day's unplayed games (from the games table) using the trained model.
 
 Usage:
     nba-pickem-predict              # Predict today's games
@@ -15,8 +15,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 from nba_pickem.config import PROJECT_ROOT
-from nba_pickem.dataloader import get_games, save_predictions
-from nba_pickem.schedule import fetch_scoreboard, parse_scoreboard
+from nba_pickem.dataloader import get_games, get_unplayed_games, save_predictions
 from nba_pickem.features import add_matchup_diffs, matchup_features, season_for_date
 
 
@@ -46,6 +45,23 @@ def predict_games(games_df: pd.DataFrame, model_data: dict) -> pd.DataFrame:
     return games_df
 
 
+def predict_for_date(prediction_date: date) -> pd.DataFrame:
+    """Predict and save unplayed games on a date. Played games are never re-predicted."""
+    schedule = get_unplayed_games(prediction_date.isoformat())
+    if schedule.empty:
+        return schedule
+    previous_games = get_games(end_date=prediction_date.isoformat(), played_only=True)
+    predictions = predict_games(attach_features(schedule, previous_games, prediction_date), load_model())
+    save_predictions(predictions)
+    return predictions
+
+
+def print_predictions(predictions: pd.DataFrame):
+    for _, row in predictions.iterrows():
+        winner = row['home_team_id'] if row['predicted_home_team_wins'] else row['away_team_id']
+        print(f"  {row['home_team_id']} vs {row['away_team_id']}: {winner} ({row['home_win_probability']:.0%} home)")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generate NBA game predictions")
     parser.add_argument("date", nargs="?", help="Date to predict (YYYY-MM-DD)")
@@ -54,25 +70,14 @@ def main():
     prediction_date = datetime.strptime(args.date, "%Y-%m-%d").date() if args.date else datetime.now(ZoneInfo('US/Eastern')).date()
 
     print(f"Generating predictions for {prediction_date}...")
+    predictions = predict_for_date(prediction_date)
 
-    model_data = load_model()
-    previous_games = get_games(end_date=prediction_date.strftime('%Y-%m-%d'))
-
-    schedule = parse_scoreboard(fetch_scoreboard(prediction_date), prediction_date)
-    games_df = attach_features(schedule, previous_games, prediction_date)
-
-    if games_df.empty:
-        print("No games found for this date.")
+    if predictions.empty:
+        print("No unplayed games stored for this date. Run nba-pickem-daily or nba-pickem-load-bball-ref --season N first.")
         return
 
-    predictions_df = predict_games(games_df, model_data)
-    save_predictions(predictions_df)
-
-    print(f"Saved {len(predictions_df)} predictions to database.")
-    print("\nPredictions:")
-    for _, row in predictions_df.iterrows():
-        winner = row['home_team_id'] if row['predicted_home_team_wins'] else row['away_team_id']
-        print(f"  {row['home_team_id']} vs {row['away_team_id']}: {winner} ({row['home_win_probability']:.0%} home)")
+    print(f"Saved {len(predictions)} predictions to database.")
+    print_predictions(predictions)
 
 
 if __name__ == "__main__":
