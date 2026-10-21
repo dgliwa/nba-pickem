@@ -4,6 +4,8 @@
 Selection uses only temporal folds (train on earlier seasons, test on the next).
 The final season is touched once, for the selected config and fixed references.
 """
+import argparse
+
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
@@ -15,15 +17,18 @@ from nba_pickem.dataloader import get_games
 from nba_pickem.features import add_matchup_diffs
 
 
-SELECTION_FOLDS = [(2024, [2022, 2023]), (2025, [2022, 2023, 2024])]
-FINAL_FOLD = (2026, [2022, 2023, 2024, 2025])
+SELECTION_SEASONS = (2024, 2025)
+FINAL_SEASON = 2026
 CLAIMED_WINNER = ("ratings_only", "rf_shallow")
+EARLY_SEASON_DAYS = 14
 
 TEAMS = ['home_team_enc', 'away_team_enc']
 OFF_DEF = [f'{side}_{kind}_rtg_{n}' for side in ('home', 'away') for kind in ('off', 'def') for n in (5, 10)]
 MARGIN = [f'{side}_margin_{n}' for side in ('home', 'away') for n in (5, 10)]
 WINPCT = [f'{side}_win_pct_{n}' for side in ('home', 'away') for n in (5, 10)]
 DIFFS = ['d_margin_5', 'd_margin_10', 'd_win_pct_5', 'd_win_pct_10']
+HOME_AWAY = ['home_wpct_home', 'away_wpct_away']
+ELO = ['d_elo']
 
 FEATURE_SETS = {
     "all_features": TEAMS + WINPCT + OFF_DEF + MARGIN + ['rest_days', 'home_wpct_home', 'away_wpct_away'],
@@ -34,7 +39,11 @@ FEATURE_SETS = {
     "ratings_plus_rest": TEAMS + OFF_DEF + MARGIN + ['rest_days'],
     "winpct_only": TEAMS + WINPCT + ['home_wpct_home', 'away_wpct_away'],
     "diffs_only": DIFFS,
-    "diffs_plus_home_away": DIFFS + ['home_wpct_home', 'away_wpct_away'],
+    "diffs_plus_home_away": DIFFS + HOME_AWAY,
+    "elo_only": ELO,
+    "elo_plus_home_away": ELO + HOME_AWAY,
+    "diffs_plus_home_away_elo": DIFFS + HOME_AWAY + ELO,
+    "all_features_elo": TEAMS + WINPCT + OFF_DEF + MARGIN + ['rest_days'] + HOME_AWAY + ELO,
 }
 
 MODELS = {
@@ -46,8 +55,8 @@ MODELS = {
 }
 
 
-def split_fold(games: pd.DataFrame, test_season: int, train_seasons: list[int]) -> tuple[pd.DataFrame, pd.DataFrame]:
-    train = games[games['season'].isin(train_seasons)].copy()
+def split_fold(games: pd.DataFrame, test_season: int, train_start: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    train = games[games['season'].between(train_start, test_season - 1)].copy()
     test = games[games['season'] == test_season].copy()
     team_codes = {team: code for code, team in enumerate(sorted(train['home_team_id'].unique()))}
     for df in (train, test):
@@ -56,57 +65,66 @@ def split_fold(games: pd.DataFrame, test_season: int, train_seasons: list[int]) 
     return train, test
 
 
-def fit_and_score(model_name: str, columns: list[str], train: pd.DataFrame, test: pd.DataFrame) -> tuple[int, int]:
+def fit_and_score(model_name: str, columns: list[str], train: pd.DataFrame, test: pd.DataFrame) -> tuple[int, int, int, int]:
+    """Correct and total over the test season, then over its first EARLY_SEASON_DAYS days."""
     model = MODELS[model_name]()
     model.fit(train[columns], train['home_team_wins'].astype(int))
-    correct = int((model.predict(test[columns]) == test['home_team_wins'].astype(int)).sum())
-    return correct, len(test)
+    hits = model.predict(test[columns]) == test['home_team_wins'].astype(int)
+    early = test['game_date_est'] < test['game_date_est'].min() + pd.Timedelta(days=EARLY_SEASON_DAYS)
+    return int(hits.sum()), len(test), int(hits[early].sum()), int(early.sum())
 
 
-def run_selection(games: pd.DataFrame) -> pd.DataFrame:
-    folds = {season: split_fold(games, season, train_seasons) for season, train_seasons in SELECTION_FOLDS}
+def run_selection(games: pd.DataFrame, train_start: int) -> pd.DataFrame:
+    folds = {season: split_fold(games, season, train_start) for season in SELECTION_SEASONS}
     rows = []
     for feature_set, columns in FEATURE_SETS.items():
         for model_name in MODELS:
             scores = {season: fit_and_score(model_name, columns, *folds[season]) for season in folds}
-            total_correct = sum(c for c, _ in scores.values())
-            total_n = sum(n for _, n in scores.values())
+            total_correct = sum(s[0] for s in scores.values())
+            total_n = sum(s[1] for s in scores.values())
             rows.append({
                 'feature_set': feature_set,
                 'model': model_name,
                 'n_features': len(columns),
-                **{f'acc_{season}': c / n for season, (c, n) in scores.items()},
+                **{f'acc_{season}': s[0] / s[1] for season, s in scores.items()},
                 'acc_mean': total_correct / total_n,
+                'acc_early': sum(s[2] for s in scores.values()) / sum(s[3] for s in scores.values()),
                 'se': np.sqrt(total_correct / total_n * (1 - total_correct / total_n) / total_n),
             })
     return pd.DataFrame(rows).sort_values('acc_mean', ascending=False).reset_index(drop=True)
 
 
-def report_final(games: pd.DataFrame, selected: tuple[str, str]) -> None:
-    season, train_seasons = FINAL_FOLD
-    train, test = split_fold(games, season, train_seasons)
+def report_final(games: pd.DataFrame, selected: tuple[str, str], train_start: int) -> None:
+    season = FINAL_SEASON
+    train, test = split_fold(games, season, train_start)
     home_rate = test['home_team_wins'].astype(int).mean()
     print(f"\n=== FINAL {season} (single look, {len(test)} games) ===")
     print(f"always-home baseline: {home_rate:.4f}")
     for label, (feature_set, model_name) in {"selected": selected, "previously claimed winner": CLAIMED_WINNER}.items():
-        correct, n = fit_and_score(model_name, FEATURE_SETS[feature_set], train, test)
+        correct, n, _, _ = fit_and_score(model_name, FEATURE_SETS[feature_set], train, test)
         acc = correct / n
         se = np.sqrt(acc * (1 - acc) / n)
         print(f"{label:28} {feature_set} + {model_name}: {acc:.4f} +/- {se:.4f} ({correct}/{n})")
 
 
 def main():
-    games = add_matchup_diffs(get_games(played_only=True))
-    results = run_selection(games)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--train-start", type=int, default=2022,
+                        help="First training season for every fold (2015 is Elo warm-up; use 2016+)")
+    args = parser.parse_args()
 
-    print("=== WALK-FORWARD SELECTION (folds: 2024<-2022-23, 2025<-2022-24) ===")
-    for season, _ in SELECTION_FOLDS:
+    games = add_matchup_diffs(get_games(played_only=True))
+    results = run_selection(games, args.train_start)
+
+    folds = ", ".join(f"{s}<-{args.train_start}-{s - 1}" for s in SELECTION_SEASONS)
+    print(f"=== WALK-FORWARD SELECTION (folds: {folds}; acc_early = first {EARLY_SEASON_DAYS} days) ===")
+    for season in SELECTION_SEASONS:
         home_rate = games[games['season'] == season]['home_team_wins'].astype(int).mean()
         print(f"always-home baseline {season}: {home_rate:.4f}")
     print(results.to_string(index=False, float_format=lambda x: f"{x:.4f}"))
 
     best = results.iloc[0]
-    report_final(games, (best['feature_set'], best['model']))
+    report_final(games, (best['feature_set'], best['model']), args.train_start)
 
 
 if __name__ == "__main__":

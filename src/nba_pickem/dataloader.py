@@ -117,6 +117,28 @@ def get_unplayed_games(game_date: str) -> pd.DataFrame:
     return df
 
 
+def update_elo():
+    """Recompute pre-game Elo for all stored games (played and upcoming) across all seasons."""
+    from .features import compute_elo
+
+    conn = get_connection()
+    games = conn.execute("""
+        SELECT game_id, home_team_id, away_team_id, game_date_est, season,
+               home_team_points, away_team_points, home_team_wins
+        FROM games
+    """).df()
+    elo = compute_elo(games)
+    conn.execute("ALTER TABLE games ADD COLUMN IF NOT EXISTS home_elo_pre DOUBLE")
+    conn.execute("ALTER TABLE games ADD COLUMN IF NOT EXISTS away_elo_pre DOUBLE")
+    conn.register("elo", elo)
+    conn.execute("""
+        UPDATE games SET home_elo_pre = elo.home_elo_pre, away_elo_pre = elo.away_elo_pre
+        FROM elo WHERE games.game_id = elo.game_id
+    """)
+    conn.close()
+    return elo
+
+
 def ensure_season(season: int):
     conn = get_connection()
     conn.execute("INSERT OR IGNORE INTO seasons (season_year) VALUES (?)", [season])

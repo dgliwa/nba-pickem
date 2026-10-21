@@ -380,6 +380,10 @@ def load_season(season: int, force: bool = False, months: list[str] | None = Non
         recompute_features(season)
         print(f"  Features computed!")
     
+    # Always: schedule changes alter upcoming games' pre-game ratings too
+    from nba_pickem.dataloader import update_elo
+    update_elo()
+    
     return newly_scored
 
 
