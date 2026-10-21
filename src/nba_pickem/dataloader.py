@@ -42,18 +42,11 @@ def init_db():
     conn.execute("""
         CREATE TABLE IF NOT EXISTS game_predictions (
             game_id VARCHAR PRIMARY KEY,
-            home_team_id INTEGER,
-            away_team_id INTEGER,
-            predicted_home_team_wins BOOLEAN,
+            home_team_id VARCHAR,
+            away_team_id VARCHAR,
             game_date_est DATE,
-            home_win_pct DECIMAL(5,4),
-            home_home_win_pct DECIMAL(5,4),
-            away_win_pct DECIMAL(5,4),
-            away_away_win_pct DECIMAL(5,4),
-            home_last_10_win_pct DECIMAL(5,4),
-            away_last_10_win_pct DECIMAL(5,4),
-            home_team_b2b BOOLEAN,
-            away_team_b2b BOOLEAN
+            predicted_home_team_wins BOOLEAN,
+            home_win_probability DECIMAL(5,4)
         )
     """)
     conn.execute("""
@@ -482,20 +475,14 @@ def get_predictions(game_date: str | None = None) -> pd.DataFrame:
 
 
 def save_predictions(predictions_df: pd.DataFrame):
+    columns = ["game_id", "home_team_id", "away_team_id", "game_date_est",
+               "predicted_home_team_wins", "home_win_probability"]
+    df = predictions_df.rename(columns=str.lower)[columns]
     conn = get_connection()
-    df = predictions_df.rename(columns=str.lower)
-    temp_table = "temp_preds"
-    conn.execute(f"CREATE TABLE {temp_table} AS SELECT * FROM game_predictions WHERE 1=0")
-    conn.execute(f"INSERT INTO {temp_table} SELECT * FROM df")
-    conn.execute(f"""
-        MERGE INTO game_predictions g
-        USING {temp_table} t
-        ON g.game_id = t.game_id
-        WHEN MATCHED THEN UPDATE SET
-            predicted_home_team_wins = t.predicted_home_team_wins
-        WHEN NOT MATCHED THEN INSERT *
+    conn.execute("""
+        INSERT OR REPLACE INTO game_predictions
+        SELECT * FROM df
     """)
-    conn.execute(f"DROP TABLE {temp_table}")
     conn.close()
 
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """NBA Pick'em - Prediction Script
 
-Generates predictions for today's games using the trained model.
+Generates predictions for a day's games using the trained model.
 
 Usage:
     nba-pickem-predict              # Predict today's games
@@ -9,28 +9,19 @@ Usage:
 """
 import argparse
 import pickle
-import pandas as pd
-import numpy as np
-import requests
-from datetime import datetime, date
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
+
+import pandas as pd
+import requests
 
 from nba_pickem.config import PROJECT_ROOT
 from nba_pickem.dataloader import get_games, save_predictions
+from nba_pickem.features import add_matchup_diffs, matchup_features, season_for_date
 
 
 MODEL_PATH = PROJECT_ROOT / "worker" / "best_model.pkl"
-
-
-FEATURE_COLS = [
-    'home_team_enc', 'away_team_enc',
-    'home_off_rtg_5', 'home_off_rtg_10',
-    'home_def_rtg_5', 'home_def_rtg_10',
-    'away_off_rtg_5', 'away_off_rtg_10',
-    'away_def_rtg_5', 'away_def_rtg_10',
-    'home_margin_5', 'home_margin_10',
-    'away_margin_5', 'away_margin_10',
-]
+REQUEST_TIMEOUT_SECONDS = 20
 
 
 def load_model():
@@ -51,102 +42,45 @@ def fetch_todays_games(prediction_date: date):
     }
     formatted_date = prediction_date.strftime('%m/%d/%Y')
     url = f"https://stats.nba.com/stats/scoreboardV2?DayOffset=0&LeagueID=00&gameDate={formatted_date}"
-    return requests.get(url, headers=HEADERS).json()
+    return requests.get(url, headers=HEADERS, timeout=REQUEST_TIMEOUT_SECONDS).json()
 
 
-def compute_team_features(team_id: int, prior_games: pd.DataFrame, n_values: list[int] = [5, 10]) -> dict:
-    """Compute offensive/defensive ratings and margins for a team based on prior games."""
-    team_prior = prior_games[
-        (prior_games['home_team_id'] == team_id) | (prior_games['away_team_id'] == team_id)
-    ].sort_values('game_date_est')
-    
-    features = {}
-    
-    for n in n_values:
-        last_n = team_prior.tail(n)
-        if last_n.empty:
-            features[f'home_off_rtg_{n}'] = 100.0
-            features[f'home_def_rtg_{n}'] = 100.0
-            features[f'home_margin_{n}'] = 0.0
-            features[f'away_off_rtg_{n}'] = 100.0
-            features[f'away_def_rtg_{n}'] = 100.0
-            features[f'away_margin_{n}'] = 0.0
-            continue
-        
-        last_n = last_n.copy()
-        last_n['is_home'] = last_n['home_team_id'] == team_id
-        
-        last_n['pts_for'] = last_n.apply(
-            lambda r: r['home_team_points'] if r['home_team_id'] == team_id else r['away_team_points'], axis=1
-        )
-        last_n['pts_against'] = last_n.apply(
-            lambda r: r['away_team_points'] if r['home_team_id'] == team_id else r['home_team_points'], axis=1
-        )
-        last_n['margin'] = last_n['pts_for'] - last_n['pts_against']
-        
-        if last_n['is_home'].any():
-            home_games = last_n[last_n['is_home']]
-            if not home_games.empty:
-                features[f'home_off_rtg_{n}'] = home_games['pts_for'].mean()
-                features[f'home_def_rtg_{n}'] = home_games['pts_against'].mean()
-                features[f'home_margin_{n}'] = home_games['margin'].mean()
-            else:
-                features[f'home_off_rtg_{n}'] = 100.0
-                features[f'home_def_rtg_{n}'] = 100.0
-                features[f'home_margin_{n}'] = 0.0
-        else:
-            features[f'home_off_rtg_{n}'] = 100.0
-            features[f'home_def_rtg_{n}'] = 100.0
-            features[f'home_margin_{n}'] = 0.0
-        
-        if (~last_n['is_home']).any():
-            away_games = last_n[~last_n['is_home']]
-            if not away_games.empty:
-                features[f'away_off_rtg_{n}'] = away_games['pts_for'].mean()
-                features[f'away_def_rtg_{n}'] = away_games['pts_against'].mean()
-                features[f'away_margin_{n}'] = away_games['margin'].mean()
-            else:
-                features[f'away_off_rtg_{n}'] = 100.0
-                features[f'away_def_rtg_{n}'] = 100.0
-                features[f'away_margin_{n}'] = 0.0
-        else:
-            features[f'away_off_rtg_{n}'] = 100.0
-            features[f'away_def_rtg_{n}'] = 100.0
-            features[f'away_margin_{n}'] = 0.0
-    
-    return features
+def team_abbreviations(games_response) -> dict:
+    # TODO: unverified against a live response (stats.nba.com timed out when this was written)
+    line_scores = next(rs for rs in games_response['resultSets'] if rs['name'] == 'LineScore')
+    id_col = line_scores['headers'].index('TEAM_ID')
+    abbr_col = line_scores['headers'].index('TEAM_ABBREVIATION')
+    return {row[id_col]: row[abbr_col] for row in line_scores['rowSet']}
 
 
-def extract_game_features(games_response, previous_games, prediction_date: date, cat_mapping: dict):
-    results = games_response['resultSets']
-    game_headers = results[0]
-    
+def extract_game_features(games_response, previous_games: pd.DataFrame, prediction_date: date) -> pd.DataFrame:
+    game_date = pd.Timestamp(prediction_date)
+    prior = previous_games[
+        (previous_games['game_date_est'] < game_date)
+        & (previous_games['season'] == season_for_date(game_date))
+    ]
+    abbreviations = team_abbreviations(games_response)
+    game_headers = next(rs for rs in games_response['resultSets'] if rs['name'] == 'GameHeader')
+
     games = []
-    for game in game_headers.get('rowSet'):
-        game_id = game[2]
-        home_team_id = game[6]
-        away_team_id = game[7]
-        
-        home_features = compute_team_features(home_team_id, previous_games)
-        away_features = compute_team_features(away_team_id, previous_games)
-        
+    for game in game_headers['rowSet']:
+        home_team, away_team = abbreviations[game[6]], abbreviations[game[7]]
         games.append({
-            "game_id": game_id,
-            "home_team_id": home_team_id,
-            "away_team_id": away_team_id,
+            "game_id": game[2],
+            "home_team_id": home_team,
+            "away_team_id": away_team,
             "game_date_est": prediction_date,
-            "home_team_enc": cat_mapping.get(home_team_id, -1),
-            "away_team_enc": cat_mapping.get(away_team_id, -1),
-            **home_features,
-            **away_features,
+            **matchup_features(prior, home_team, away_team),
         })
-    
-    return pd.DataFrame(games)
+
+    return add_matchup_diffs(pd.DataFrame(games))
 
 
-def predict_games(games_df, model):
-    X = games_df[FEATURE_COLS].copy()
-    games_df["predicted_home_team_wins"] = model.predict(X)
+def predict_games(games_df: pd.DataFrame, model_data: dict) -> pd.DataFrame:
+    X = games_df[model_data['feature_cols']]
+    model = model_data['model']
+    games_df["home_win_probability"] = model.predict_proba(X)[:, 1]
+    games_df["predicted_home_team_wins"] = games_df["home_win_probability"] >= 0.5
     return games_df
 
 
@@ -160,29 +94,23 @@ def main():
     print(f"Generating predictions for {prediction_date}...")
 
     model_data = load_model()
-    model = model_data['model']
-    
     previous_games = get_games(end_date=prediction_date.strftime('%Y-%m-%d'))
-    
-    cat_type = previous_games['home_team_id'].astype('category')
-    cat_mapping = dict(zip(cat_type.cat.categories, cat_type.cat.codes))
-    
-    games_response = fetch_todays_games(prediction_date)
 
-    games_df = extract_game_features(games_response, previous_games, prediction_date, cat_mapping)
+    games_response = fetch_todays_games(prediction_date)
+    games_df = extract_game_features(games_response, previous_games, prediction_date)
 
     if games_df.empty:
         print("No games found for this date.")
         return
 
-    predictions_df = predict_games(games_df, model)
+    predictions_df = predict_games(games_df, model_data)
     save_predictions(predictions_df)
 
     print(f"Saved {len(predictions_df)} predictions to database.")
     print("\nPredictions:")
     for _, row in predictions_df.iterrows():
-        result = "HOME WIN" if row['predicted_home_team_wins'] else "AWAY WIN"
-        print(f"  {row['home_team_id']} vs {row['away_team_id']}: {result}")
+        winner = row['home_team_id'] if row['predicted_home_team_wins'] else row['away_team_id']
+        print(f"  {row['home_team_id']} vs {row['away_team_id']}: {winner} ({row['home_win_probability']:.0%} home)")
 
 
 if __name__ == "__main__":
