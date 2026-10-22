@@ -2,7 +2,7 @@
 """NBA Pick'em - Daily job
 
 Syncs the current season from basketball-reference (fills in results for games played,
-refreshes the schedule), then predicts today's games.
+refreshes the schedule), refreshes recent moneyline odds, then predicts today's games.
 
 Usage:
     nba-pickem-daily
@@ -15,6 +15,7 @@ import pandas as pd
 from nba_pickem.dataloader import ensure_season, update_season_games_count
 from nba_pickem.features import season_for_date
 from nba_pickem.scripts.load_bball_ref_data import load_season
+from nba_pickem.scripts.load_odds import refresh_recent_odds
 from nba_pickem.scripts.run_prediction import predict_for_date, print_predictions
 
 
@@ -25,6 +26,7 @@ def main():
     ensure_season(season)
     load_season(season)
     update_season_games_count(season)
+    refresh_recent_odds(today)
 
     print(f"\nPredictions for {today}:")
     predictions = predict_for_date(today)

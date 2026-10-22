@@ -50,14 +50,16 @@ def init_db():
         )
     """)
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS moneyline_odds (
-            id INTEGER PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS moneylines (
             game_id VARCHAR,
             sportsbook VARCHAR,
-            home_odds INTEGER,
-            away_odds INTEGER,
             game_date_est DATE,
-            line_datetime TIMESTAMP
+            open_home_odds INTEGER,
+            open_away_odds INTEGER,
+            latest_home_odds INTEGER,
+            latest_away_odds INTEGER,
+            fetched_at TIMESTAMP,
+            PRIMARY KEY (game_id, sportsbook)
         )
     """)
     conn.execute("""
@@ -108,7 +110,7 @@ def get_games(start_date: str | None = None, end_date: str | None = None, played
 def get_unplayed_games(game_date: str) -> pd.DataFrame:
     conn = get_connection()
     df = conn.execute("""
-        SELECT game_id, home_team_id, away_team_id, game_date_est, home_elo_pre, away_elo_pre
+        SELECT game_id, home_team_id, away_team_id, game_date_est, home_elo_pre, away_elo_pre, elo_context_adj
         FROM games
         WHERE game_date_est = ? AND home_team_wins IS NULL
         ORDER BY game_id
@@ -118,7 +120,7 @@ def get_unplayed_games(game_date: str) -> pd.DataFrame:
 
 
 def update_elo():
-    """Recompute pre-game Elo for all stored games (played and upcoming) across all seasons."""
+    """Recompute pre-game Elo and rest/travel context for all stored games (played and upcoming)."""
     from .features import compute_elo
 
     conn = get_connection()
@@ -128,11 +130,14 @@ def update_elo():
         FROM games
     """).df()
     elo = compute_elo(games)
-    conn.execute("ALTER TABLE games ADD COLUMN IF NOT EXISTS home_elo_pre DOUBLE")
-    conn.execute("ALTER TABLE games ADD COLUMN IF NOT EXISTS away_elo_pre DOUBLE")
+    for column in ('home_elo_pre', 'away_elo_pre', 'elo_context_adj', 'home_travel_miles', 'away_travel_miles'):
+        conn.execute(f"ALTER TABLE games ADD COLUMN IF NOT EXISTS {column} DOUBLE")
     conn.register("elo", elo)
     conn.execute("""
-        UPDATE games SET home_elo_pre = elo.home_elo_pre, away_elo_pre = elo.away_elo_pre
+        UPDATE games SET home_elo_pre = elo.home_elo_pre, away_elo_pre = elo.away_elo_pre,
+            elo_context_adj = elo.elo_context_adj,
+            home_team_b2b = elo.home_team_b2b, away_team_b2b = elo.away_team_b2b,
+            home_travel_miles = elo.home_travel_miles, away_travel_miles = elo.away_travel_miles
         FROM elo WHERE games.game_id = elo.game_id
     """)
     conn.close()
@@ -529,8 +534,10 @@ def save_predictions(predictions_df: pd.DataFrame):
 
 
 def get_moneylines(game_date: str | None = None, sportsbook: str | None = None) -> pd.DataFrame:
+    """American moneyline odds per game and sportsbook: opening line, and the latest line
+    seen (the closing line once fetched after tip-off)."""
     conn = get_connection()
-    query = "SELECT * FROM moneyline_odds"
+    query = "SELECT * FROM moneylines"
     conditions = []
     if game_date:
         conditions.append(f"game_date_est = '{game_date}'")
@@ -544,11 +551,23 @@ def get_moneylines(game_date: str | None = None, sportsbook: str | None = None) 
 
 
 def save_moneylines(moneylines_df: pd.DataFrame):
+    """Upsert odds rows; a refetch replaces the latest line and keeps the first opening line seen."""
+    if moneylines_df.empty:
+        return
     conn = get_connection()
+    conn.register("incoming", moneylines_df)
     conn.execute("""
-        INSERT INTO moneyline_odds (game_id, sportsbook, home_odds, away_odds, game_date_est, line_datetime)
-        VALUES (:game_id, :sportsbook, :home_odds, :away_odds, :game_date_est, :line_datetime)
-    """, moneylines_df.to_dicts())
+        INSERT INTO moneylines
+        SELECT game_id, sportsbook, game_date_est, open_home_odds, open_away_odds,
+               latest_home_odds, latest_away_odds, fetched_at
+        FROM incoming
+        ON CONFLICT (game_id, sportsbook) DO UPDATE SET
+            open_home_odds = COALESCE(moneylines.open_home_odds, excluded.open_home_odds),
+            open_away_odds = COALESCE(moneylines.open_away_odds, excluded.open_away_odds),
+            latest_home_odds = excluded.latest_home_odds,
+            latest_away_odds = excluded.latest_away_odds,
+            fetched_at = excluded.fetched_at
+    """)
     conn.close()
 
 

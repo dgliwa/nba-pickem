@@ -13,6 +13,7 @@ from nba_pickem.dataloader import ensure_season, update_season_games_count
 from nba_pickem.features import season_for_date
 from nba_pickem.reporting import build_daily_report
 from nba_pickem.scripts.load_bball_ref_data import load_season
+from nba_pickem.scripts.load_odds import refresh_recent_odds
 from nba_pickem.scripts.run_prediction import predict_for_date
 
 
@@ -22,6 +23,7 @@ def execute_daily(report_date: date) -> dict:
     ensure_season(season)
     load_season(season, months=[report_date.strftime("%B").lower()])
     update_season_games_count(season)
+    refresh_recent_odds(report_date)
     predict_for_date(report_date)
     return build_daily_report(report_date)
 

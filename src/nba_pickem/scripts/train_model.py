@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """NBA Pick'em - Model Training Script
 
-Trains the selected model (logistic regression on the pre-game Elo difference) and saves
+Trains the selected model (logistic regression on the rest-adjusted pre-game Elo difference) and saves
 it to worker/best_model.pkl. Reports a hold-out score on the latest training season
 using a model fit only on earlier seasons, then refits on all seasons.
 
@@ -23,7 +23,7 @@ from nba_pickem.features import MODEL_FEATURES, add_matchup_diffs
 
 MODEL_DIR = PROJECT_ROOT / "worker"
 MODEL_PATH = MODEL_DIR / "best_model.pkl"
-FEATURE_SET = "elo_only"
+FEATURE_SET = "elo_adj_only"
 MODEL_TYPE = "lr"
 
 

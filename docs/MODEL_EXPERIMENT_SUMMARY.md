@@ -11,22 +11,32 @@ basketball-reference schedule pages (played AND upcoming games)
        ├─ games table: unplayed games stored with NULL outcome; results filled in as they post;
        │   unplayed games that leave the schedule are dropped (season_sync.py)
        ├─ rolling features recomputed for newly played games (dataloader.py, played games only)
-       ├─ pre-game Elo recomputed for every stored game, played and upcoming (update_elo)
+       ├─ pre-game Elo, back-to-back flags and travel miles recomputed for every stored game, played and upcoming (update_elo)
+       ├─ moneyline odds: yesterday's closing lines and today's current lines from sportsbookreview (load_odds.py)
        └─ nba-pickem-predict -> game_predictions for today's unplayed games
 nba-pickem-train -> worker/best_model.pkl (played games only)
 ```
 
-Run `nba-pickem-daily` once a day (after results post); it syncs the current season and predicts today.
+Run `nba-pickem-daily` once a day (after results post); it syncs the current season, refreshes odds and predicts today.
+Odds history: `nba-pickem-load-odds --since 2020` (SBR has NBA moneylines from 2019-20 on; one request per date gives
+each book's opening and latest line, and the latest line is the closing line once fetched after the game).
 Game ids are deterministic (`{home}{away}{season}{YYYYMMDD}`), so predictions join to outcomes.
 A regular season counts as complete once its playoffs have started, so shortened seasons (2020 bubble, 2021's 72 games) need no special case.
 Stored games are regular season only, 2015 onward: playoff games (on/after the playoff start date) and play-in games
 (bball-ref's "Play-In Game" remark) are skipped. 2024+ seasons include the NBA Cup final, which doesn't count in the standings.
 Backfill with `nba-pickem-extract --since 2015`.
 
-Elo (`compute_elo` in `features.py`) walks all seasons in date order with FiveThirtyEight's NBA parameters: K=20,
-margin-of-victory multiplier `(|margin|+3)^0.8 / (7.5 + 0.006·winner_elo_edge)`, 100-point home advantage (none for the
-2020 bubble restart), every team starting at 1500 in 2015 and keeping 75% of its distance from 1500 between seasons.
-2015 serves as warm-up, so training starts in 2016. Parameters are untuned.
+Elo (`compute_elo` in `features.py`) walks all seasons in date order with FiveThirtyEight's NBA structure: K=20,
+margin-of-victory multiplier `(|margin|+3)^0.8 / (7.5 + 0.006·winner_elo_edge)`, every team starting at 1500 in 2015 and
+keeping 75% of its distance from 1500 between seasons. 2015 serves as warm-up, so training starts in 2016.
+
+Game context (`schedule_context`, from the schedule so upcoming games have it too) shifts the expected result:
+- Home advantage **55** (FiveThirtyEight used 100; none for the 2020 bubble restart).
+- Back-to-back penalty **45** for a team playing the day after its previous game.
+- Travel (miles since the previous game, cube root) showed **no signal** at any weight, so its penalty is 0; miles are still stored.
+
+Tuned by grid search on log-loss of the Elo win probability over 2016–2023 only (0.6305 → 0.6217); the log-loss surface is
+flat within ±5 points of the chosen values. `elo_context_adj` stores each game's rest/travel shift in Elo points (positive favours home).
 
 Rolling features use only earlier games in the same season, over a team's last N games at any venue
 (`features.py` reproduces these definitions at prediction time; `tests/test_features.py` checks they agree).
@@ -82,12 +92,25 @@ What the ablations do support:
 - `rest_days` does not help. Win-pct-only is slightly worse than ratings/margins.
 - "Ratings beat win%" from the old summary is not clearly supported; margin and win% differentials together do as well as anything.
 
+## Results with tuned Elo and rest (October 2026, train from 2016)
+
+| Feature set | Model | 2024 | 2025 | Mean | First 14 days | 2026 single look |
+|-------------|-------|------|------|------|---------------|------------------|
+| elo_plus_context (5: d_elo + b2b flags + travel) | lr | 66.2% | 67.2% | 66.69% | 64.5% | 68.8% |
+| **elo_adj_only (1: d_elo_adj)** | lr | 66.3% | 67.0% | **66.65%** | 63.0% | **69.2%** |
+| elo_only, tuned (1) | lr | 65.5% | 66.5% | 65.96% | 62.1% | 69.1% |
+| elo_only, untuned (previous selection) | lr | 65.3% | 66.3% | 65.80% | 63.0% | 68.9% |
+
+Re-tuning plus the back-to-back adjustment adds ≈0.85 pt walk-forward over untuned Elo on the same games (≈0.3 pt on 2026).
+
 ## Selected model
 
-**`elo_only` + logistic regression** (StandardScaler → LogisticRegression) on one feature, `d_elo = home_elo_pre − away_elo_pre`.
-The fitted intercept carries home advantage.
+**`elo_adj_only` + logistic regression** (StandardScaler → LogisticRegression) on one feature,
+`d_elo_adj = home_elo_pre − away_elo_pre + elo_context_adj`. The fitted intercept carries home advantage.
 
-Rule: simplest config within one SE of the best walk-forward mean. It ties the best mean with one feature.
+Rule: simplest config within one SE of the best walk-forward mean. It is 0.04 pt behind the best with one feature instead of five.
+
+Previous Elo selection (October 2026): untuned `elo_only` (d_elo, 100-point home advantage, no rest), 65.8% walk-forward.
 
 Previous selection (April 2026): `diffs_plus_home_away` + lr, 6 rolling-stat features (`ROLLING_FEATURES` in `features.py`), 65.9% on 2026.
 It predicted 53.8% home for every opening-night game, because no team had same-season history yet.
@@ -113,8 +136,8 @@ Better benchmark once odds are loaded: accuracy and log-loss vs. implied closing
 | Idea | Impact | Effort |
 |------|--------|--------|
 | Injury / starting-lineup data (biggest missing signal) | High | Medium–High |
-| Odds as a feature / CLV benchmark (SBR scraper exists, untested) | High | Medium |
-| Tune Elo (K, home advantage, carryover) on pre-2024 seasons; check calibration | Low–Medium | Low |
+| Betting backtest: edge vs. de-vigged opening line, ROI and CLV by edge threshold (odds loaded, 2020+) | High | Low–Medium |
+| Tune Elo K and carryover (home advantage and rest done) | Low | Low |
 | Per-possession ratings (pace, eFG%, TOV) from box scores | Medium | High |
 | Additional windows (3/7/20), B2B flag | Low (rest_days showed none) | Low |
 

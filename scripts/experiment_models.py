@@ -29,6 +29,7 @@ WINPCT = [f'{side}_win_pct_{n}' for side in ('home', 'away') for n in (5, 10)]
 DIFFS = ['d_margin_5', 'd_margin_10', 'd_win_pct_5', 'd_win_pct_10']
 HOME_AWAY = ['home_wpct_home', 'away_wpct_away']
 ELO = ['d_elo']
+CONTEXT = ['home_team_b2b', 'away_team_b2b', 'home_travel_miles', 'away_travel_miles']
 
 FEATURE_SETS = {
     "all_features": TEAMS + WINPCT + OFF_DEF + MARGIN + ['rest_days', 'home_wpct_home', 'away_wpct_away'],
@@ -41,6 +42,8 @@ FEATURE_SETS = {
     "diffs_only": DIFFS,
     "diffs_plus_home_away": DIFFS + HOME_AWAY,
     "elo_only": ELO,
+    "elo_adj_only": ['d_elo_adj'],
+    "elo_plus_context": ELO + CONTEXT,
     "elo_plus_home_away": ELO + HOME_AWAY,
     "diffs_plus_home_away_elo": DIFFS + HOME_AWAY + ELO,
     "all_features_elo": TEAMS + WINPCT + OFF_DEF + MARGIN + ['rest_days'] + HOME_AWAY + ELO,
