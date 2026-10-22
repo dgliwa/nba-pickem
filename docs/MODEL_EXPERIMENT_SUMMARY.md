@@ -20,6 +20,7 @@ nba-pickem-train -> worker/best_model.pkl (played games only)
 Run `nba-pickem-daily` once a day (after results post); it syncs the current season, refreshes odds and predicts today.
 Odds history: `nba-pickem-load-odds --since 2020` (SBR has NBA moneylines from 2019-20 on; one request per date gives
 each book's opening and latest line, and the latest line is the closing line once fetched after the game).
+SBR stored in-game prices as the "latest" line for Oct–Nov 2019, Jul 2020 and Oct–Nov 2021, so those closes are left empty (`IN_GAME_LATEST`).
 Game ids are deterministic (`{home}{away}{season}{YYYYMMDD}`), so predictions join to outcomes.
 A regular season counts as complete once its playoffs have started, so shortened seasons (2020 bubble, 2021's 72 games) need no special case.
 Stored games are regular season only, 2015 onward: playoff games (on/after the playoff start date) and play-in games
@@ -128,6 +129,34 @@ written by `nba-pickem-train` on 2016–2026. The older `worker/nba_model*.pkl` 
 
 NBA's own endpoints (stats.nba.com, cdn.nba.com) are blocked by Akamai from this network, so the schedule comes from bball-ref like everything else.
 
+## Betting backtest (October 2026)
+
+`uv run python scripts/backtest_betting.py`: walk-forward 2020–2026 (model refit each season on 2016..season−1), flat 1-unit
+moneyline bets on the side where the model's probability beats the market's (bookmaker margin removed) by an edge threshold.
+
+On the 7,667 games with both an opening and a closing line:
+
+| Probabilities | Log-loss | Accuracy |
+|---------------|----------|----------|
+| Model (elo_adj_only) | 0.6224 | 65.4% |
+| Opening market consensus | 0.6054 | 66.8% |
+| Closing market consensus | 0.5976 | 68.0% |
+
+| Bet at | Edge ≥ 0 | Edge ≥ 4% | Edge ≥ 8% | CLV |
+|--------|----------|-----------|-----------|-----|
+| Open, consensus price | −3.2% ± 1.5 | −3.6% ± 2.0 | −4.4% ± 2.8 | negative |
+| Open, best price across books | +2.1% ± 1.6 | +1.8% ± 2.1 | +0.7% ± 2.9 | +0.5–1.0 pt |
+| Close, best price | +0.4% ± 1.7 | −0.7% ± 2.2 | −1.7% ± 3.0 | negative |
+
+**The model has no edge over the market.**
+- At a typical price, ROI ≈ −(bookmaker margin) at every threshold, and larger edges don't do better.
+- Blending: outcome ~ logit(market) + logit(model) puts weight 0.98 on the opener and 0.03 on the model; walk-forward log-loss
+  is unchanged (0.60354 market only vs 0.60371 with the model). Against the close the model weight is slightly negative.
+- The small best-price profit is line shopping, not the model: on the same games, betting the *other* side at the best price
+  returns −0.6% to +1.7%, within noise of the model's side. Best openers also include stale prices books may not honour.
+
+Implication: for straight pick'em accuracy, the market consensus (66.8% at the open, 68% at the close) beats the model (65.4%).
+
 ## Roadmap
 
 Realistic target: a point or two over ~66% walk-forward, not 70%+ (closing betting lines are themselves in the high 60s).
@@ -136,7 +165,8 @@ Better benchmark once odds are loaded: accuracy and log-loss vs. implied closing
 | Idea | Impact | Effort |
 |------|--------|--------|
 | Injury / starting-lineup data (biggest missing signal) | High | Medium–High |
-| Betting backtest: edge vs. de-vigged opening line, ROI and CLV by edge threshold (odds loaded, 2020+) | High | Low–Medium |
+| Pick from (or blend toward) the current market line; Elo only where no line exists | Medium (≈+2 pts accuracy) | Low |
+| Find information the market prices late (injury/lineup news timing) before more modeling for betting | Unknown | High |
 | Tune Elo K and carryover (home advantage and rest done) | Low | Low |
 | Per-possession ratings (pace, eFG%, TOV) from box scores | Medium | High |
 | Additional windows (3/7/20), B2B flag | Low (rest_days showed none) | Low |

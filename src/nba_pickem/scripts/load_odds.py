@@ -25,8 +25,21 @@ from nba_pickem.scripts.load_bball_ref_data import HEADERS
 
 FIRST_ODDS_SEASON = 2020
 ODDS_URL = "https://www.sportsbookreview.com/betting-odds/nba-basketball/money-line/full-game/?date={}"
+# SBR's latest line for these game dates is an in-game price, not the close: big moves from the
+# opener go toward the eventual winner 88-100% of the time (vs ~65% in other months)
+IN_GAME_LATEST = [(date(2019, 10, 1), date(2019, 11, 30)), (date(2020, 7, 1), date(2020, 7, 31)),
+                  (date(2021, 10, 1), date(2021, 11, 30))]
 NEXT_DATA = re.compile(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', re.S)
 EASTERN = ZoneInfo("US/Eastern")
+
+
+def valid_line(line: dict) -> bool:
+    """Both sides present and plausible; SBR uses -10000 and 2**31-1 as placeholders."""
+    return all(isinstance(line.get(k), int) and 100 <= abs(line[k]) < 10000 for k in ("homeOdds", "awayOdds"))
+
+
+def closing_line_unreliable(game_date: date) -> bool:
+    return any(start <= game_date <= end for start, end in IN_GAME_LATEST)
 
 
 def parse_odds_page(html: str, team_ids: dict[str, str]) -> list[dict]:
@@ -44,16 +57,20 @@ def parse_odds_page(html: str, team_ids: dict[str, str]) -> list[dict]:
             season = season_for_date(pd.Timestamp(game_date))
             for odds in game["oddsViews"]:
                 opening, latest = (odds or {}).get("openingLine") or {}, (odds or {}).get("currentLine") or {}
-                if not latest.get("homeOdds") or not latest.get("awayOdds"):
+                if not valid_line(opening):
+                    opening = {}
+                if not valid_line(latest) or closing_line_unreliable(game_date):
+                    latest = {}
+                if not opening and not latest:
                     continue
                 rows.append({
                     "game_id": f"{home}{away}{season}{game_date.strftime('%Y%m%d')}",
                     "sportsbook": odds["sportsbook"],
                     "game_date_est": game_date,
-                    "open_home_odds": opening.get("homeOdds") or None,
-                    "open_away_odds": opening.get("awayOdds") or None,
-                    "latest_home_odds": latest["homeOdds"],
-                    "latest_away_odds": latest["awayOdds"],
+                    "open_home_odds": opening.get("homeOdds"),
+                    "open_away_odds": opening.get("awayOdds"),
+                    "latest_home_odds": latest.get("homeOdds"),
+                    "latest_away_odds": latest.get("awayOdds"),
                 })
     return rows
 
